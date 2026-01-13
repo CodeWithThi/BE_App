@@ -1,7 +1,7 @@
 // src/routers/me.router.js
 import express from "express";
-import { authMiddleware } from "../middlewares/auth.middleware.js";
-import departmentController from "../controllers/department.controller.js";
+import { authMiddleware } from "../middlewares/authMiddleware.js";
+import departmentController from "../controllers/departmentController.js";
 
 const meRouter = express.Router();
 

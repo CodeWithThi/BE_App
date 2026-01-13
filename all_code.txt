@@ -1,0 +1,1908 @@
+
+
+// ==========================================
+// File: server.js
+// ==========================================
+
+import express from "express";
+import rootRouter from "./src/routers/root_router.js";
+import cors from "cors";
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// tất cả API v1
+app.use("/api/v1", rootRouter);
+
+const port = 3069;
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
+});
+
+export default app;
+
+
+// ==========================================
+// File: package.json
+// ==========================================
+
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon --import=extensionless/register server.js",
+    "start": "node --import=extensionless/register server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.18.0",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "extensionless": "^2.0.2",
+    "jsonwebtoken": "^9.0.2",
+    "save": "^2.9.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prisma": "^6.19.1"
+  }
+}
+
+
+// ==========================================
+// File: prisma\schema.prisma
+// ==========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  A_ID                                             String        @id @db.VarChar(10)
+  UserName                                         String        @unique(map: "UserName") @db.VarChar(80)
+  PassWord                                         String        @db.VarChar(255)
+  Email                                            String        @unique(map: "Email") @db.VarChar(150)
+  R_ID                                             String        @db.VarChar(10)
+  M_ID                                             String?       @db.VarChar(10)
+  Status                                           String?       @db.VarChar(30)
+  Deleted_At                                       DateTime?     @db.DateTime(0)
+  Deleted_By                                       String?       @db.VarChar(10)
+  IsDeleted                                        Boolean       @default(false)
+  Member                                           Member?       @relation(fields: [M_ID], references: [M_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Account_Member")
+  Role                                             Role          @relation(fields: [R_ID], references: [R_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Account_Role")
+  Project                                          Project[]
+  Task                                             Task[]
+  Task_Report_Task_Report_Created_By_A_IDToAccount Task_Report[] @relation("Task_Report_Created_By_A_IDToAccount")
+  Task_Report_Task_Report_Reporter_A_IDToAccount   Task_Report[] @relation("Task_Report_Reporter_A_IDToAccount")
+
+  @@index([M_ID], map: "FK_Account_Member")
+  @@index([R_ID], map: "FK_Account_Role")
+}
+
+model Department {
+  D_ID             String       @id @db.VarChar(10)
+  D_Name           String       @db.VarChar(200)
+  Parent_D_ID      String?      @db.VarChar(10)
+  Status           String?      @db.VarChar(30)
+  Deleted_At       DateTime?    @db.DateTime(0)
+  Deleted_By       String?      @db.VarChar(10)
+  IsDeleted        Boolean      @default(false)
+  Department       Department?  @relation("DepartmentToDepartment", fields: [Parent_D_ID], references: [D_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Department_Parent")
+  other_Department Department[] @relation("DepartmentToDepartment")
+  Member           Member[]
+  Project          Project[]
+
+  @@index([Parent_D_ID], map: "FK_Department_Parent")
+}
+
+model Member {
+  M_ID        String     @id @db.VarChar(10)
+  FullName    String     @db.VarChar(200)
+  PhoneNumber String?    @db.VarChar(30)
+  BirthDate   DateTime?  @db.Date
+  JoinDate    DateTime?  @db.Date
+  D_ID        String     @db.VarChar(10)
+  Status      String?    @db.VarChar(30)
+  Deleted_At  DateTime?  @db.DateTime(0)
+  Deleted_By  String?    @db.VarChar(10)
+  IsDeleted   Boolean    @default(false)
+  Account     Account[]
+  Department  Department @relation(fields: [D_ID], references: [D_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Member_Department")
+  Task        Task[]
+
+  @@index([D_ID], map: "FK_Member_Department")
+}
+
+model Permission {
+  P_ID            String            @id @db.VarChar(10)
+  P_Name          String            @unique(map: "P_Name") @db.VarChar(150)
+  Description     String?           @db.VarChar(400)
+  Role_Permission Role_Permission[]
+}
+
+model Project {
+  P_ID            String     @id @db.VarChar(10)
+  D_ID            String     @db.VarChar(10)
+  P_Name          String     @db.VarChar(200)
+  Begin_Date      DateTime?  @db.Date
+  End_Date        DateTime?  @db.Date
+  Created_By_A_ID String?    @db.VarChar(10)
+  Status          String?    @db.VarChar(30)
+  Deleted_At      DateTime?  @db.DateTime(0)
+  Deleted_By      String?    @db.VarChar(10)
+  IsDeleted       Boolean    @default(false)
+  Account         Account?   @relation(fields: [Created_By_A_ID], references: [A_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Project_CreatedBy")
+  Department      Department @relation(fields: [D_ID], references: [D_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Project_Department")
+  Task            Task[]
+
+  @@index([Created_By_A_ID], map: "FK_Project_CreatedBy")
+  @@index([D_ID], map: "FK_Project_Department")
+}
+
+model Role {
+  R_ID            String            @id @db.VarChar(10)
+  R_Name          String            @unique(map: "R_Name") @db.VarChar(100)
+  Description     String?           @db.VarChar(400)
+  Account         Account[]
+  Role_Permission Role_Permission[]
+}
+
+model Role_Permission {
+  R_ID       String     @db.VarChar(10)
+  P_ID       String     @db.VarChar(10)
+  Permission Permission @relation(fields: [P_ID], references: [P_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_RP_Permission")
+  Role       Role       @relation(fields: [R_ID], references: [R_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_RP_Role")
+
+  @@id([R_ID, P_ID])
+  @@index([P_ID], map: "FK_RP_Permission")
+}
+
+model Task {
+  T_ID             String        @id @db.VarChar(10)
+  Title            String        @db.VarChar(200)
+  Description      String?       @db.Text
+  Begin_Date       DateTime?     @db.Date
+  Due_Date         DateTime?     @db.Date
+  Priority         String?       @db.VarChar(30)
+  Complete_At      DateTime?     @db.DateTime(0)
+  P_ID             String        @db.VarChar(10)
+  Assigned_ID_M_ID String?       @db.VarChar(10)
+  Created_By_A_ID  String?       @db.VarChar(10)
+  Status           String?       @db.VarChar(30)
+  Deleted_At       DateTime?     @db.DateTime(0)
+  Deleted_By       String?       @db.VarChar(10)
+  IsDeleted        Boolean       @default(false)
+  Member           Member?       @relation(fields: [Assigned_ID_M_ID], references: [M_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_AssignedMember")
+  Account          Account?      @relation(fields: [Created_By_A_ID], references: [A_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_CreatedBy")
+  Project          Project       @relation(fields: [P_ID], references: [P_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_Project")
+  Task_Report      Task_Report[]
+
+  @@index([Assigned_ID_M_ID], map: "FK_Task_AssignedMember")
+  @@index([Created_By_A_ID], map: "FK_Task_CreatedBy")
+  @@index([P_ID], map: "FK_Task_Project")
+}
+
+model Task_Report {
+  TR_ID                                        String    @id @db.VarChar(10)
+  Progress                                     String?   @db.VarChar(50)
+  Period_Type                                  String?   @db.VarChar(30)
+  Period_Start                                 DateTime? @db.Date
+  Period_End                                   DateTime? @db.Date
+  Content                                      String?   @db.Text
+  Complete_At                                  DateTime? @db.DateTime(0)
+  T_ID                                         String    @db.VarChar(10)
+  Reporter_A_ID                                String?   @db.VarChar(10)
+  Created_By_A_ID                              String?   @db.VarChar(10)
+  Status                                       String?   @db.VarChar(30)
+  Deleted_At                                   DateTime? @db.DateTime(0)
+  Deleted_By                                   String?   @db.VarChar(10)
+  IsDeleted                                    Boolean   @default(false)
+  Account_Task_Report_Created_By_A_IDToAccount Account?  @relation("Task_Report_Created_By_A_IDToAccount", fields: [Created_By_A_ID], references: [A_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_TR_CreatedBy")
+  Account_Task_Report_Reporter_A_IDToAccount   Account?  @relation("Task_Report_Reporter_A_IDToAccount", fields: [Reporter_A_ID], references: [A_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_TR_Reporter")
+  Task                                         Task      @relation(fields: [T_ID], references: [T_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_TR_Task")
+
+  @@index([Created_By_A_ID], map: "FK_TR_CreatedBy")
+  @@index([Reporter_A_ID], map: "FK_TR_Reporter")
+  @@index([T_ID], map: "FK_TR_Task")
+}
+
+
+// ==========================================
+// File: src\common\constant\app.constant.js
+// ==========================================
+
+import "dotenv/config";
+
+export const DATABASE_URL = process.env.DATABASE_URL;
+export const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
+export const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN;
+export const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
+export const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN;
+
+
+// ==========================================
+// File: src\common\prisma\init.prisma.js
+// ==========================================
+
+// src/common/prisma/init.prisma.js
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+export default prisma;
+
+
+// ==========================================
+// File: src\controllers\account.controller.js
+// ==========================================
+
+// src/controllers/account.controller.js
+import accountServices from "../services/account.services.js";
+
+const accountController = {
+  createAccount: async (req, res) => {
+    const r = await accountServices.createAccount(req);
+    return res.status(r.status).json(r);
+  },
+
+  listAccounts: async (req, res) => {
+    const r = await accountServices.listAccounts(req);
+    return res.status(r.status).json(r);
+  },
+
+  changeStatus: async (req, res) => {
+    const r = await accountServices.changeStatus(req);
+    return res.status(r.status).json(r);
+  },
+
+  softDelete: async (req, res) => {
+    const r = await accountServices.softDelete(req);
+    return res.status(r.status).json(r);
+  },
+};
+
+export default accountController;
+
+
+// ==========================================
+// File: src\controllers\auth.controller.js
+// ==========================================
+
+// src/controllers/auth.controller.js
+import authServices from "../services/auth.services.js";
+
+const authController = {
+  login: async (req, res) => {
+    const r = await authServices.login(req);
+    // 👇 phải trả cả object r, KHÔNG được .json(r.status) hay .sendStatus(...)
+    res.status(r.status).json(r);
+  },
+
+  me: async (req, res) => {
+    const r = await authServices.me(req);
+    res.status(r.status).json(r);
+  },
+
+  changePassword: async (req, res) => {
+    const r = await authServices.changePassword(req);
+    res.status(r.status).json(r);
+  },
+};
+
+export default authController;
+
+
+// ==========================================
+// File: src\controllers\dashboard.controller.js
+// ==========================================
+
+import dashboardServices from "../services/dashboard.services.js";
+
+const dashboardController = {
+    getStats: async (req, res) => {
+        const r = await dashboardServices.getStats(req);
+        return res.status(r.status).json(r);
+    }
+};
+
+export default dashboardController;
+
+
+// ==========================================
+// File: src\controllers\department.controller.js
+// ==========================================
+
+// src/controllers/department.controller.js
+import departmentServices from "../services/department.services.js";
+
+const departmentController = {
+  create: async (req, res) => {
+    const r = await departmentServices.createDepartment(req);
+    return res.status(r.status).json(r);
+  },
+  update: async (req, res) => {
+    const r = await departmentServices.updateDepartment(req);
+    return res.status(r.status).json(r);
+  },
+  softDelete: async (req, res) => {
+    const r = await departmentServices.softDeleteDepartment(req);
+    return res.status(r.status).json(r);
+  },
+  list: async (req, res) => {
+    const r = await departmentServices.listDepartments(req); // << dòng 18
+    return res.status(r.status).json(r);
+  },
+  detail: async (req, res) => {
+    const r = await departmentServices.getDepartmentById(req);
+    return res.status(r.status).json(r);
+  },
+  myDepartment: async (req, res) => {
+    const r = await departmentServices.getMyDepartment(req);
+    return res.status(r.status).json(r);
+  },
+};
+
+export default departmentController;
+
+
+// ==========================================
+// File: src\controllers\project.controller.js
+// ==========================================
+
+import projectServices from "../services/project.services.js";
+
+const projectController = {
+    createProject: async (req, res) => {
+        const r = await projectServices.createProject(req);
+        return res.status(r.status).json(r);
+    },
+    listProjects: async (req, res) => {
+        const r = await projectServices.listProjects(req);
+        return res.status(r.status).json(r);
+    },
+    getProject: async (req, res) => {
+        const r = await projectServices.getProject(req);
+        return res.status(r.status).json(r);
+    },
+    updateProject: async (req, res) => {
+        const r = await projectServices.updateProject(req);
+        return res.status(r.status).json(r);
+    },
+    deleteProject: async (req, res) => {
+        const r = await projectServices.deleteProject(req);
+        return res.status(r.status).json(r);
+    },
+};
+
+export default projectController;
+
+
+// ==========================================
+// File: src\controllers\task.controller.js
+// ==========================================
+
+import taskServices from "../services/task.services.js";
+
+const taskController = {
+    createTask: async (req, res) => {
+        const r = await taskServices.createTask(req);
+        return res.status(r.status).json(r);
+    },
+    listTasks: async (req, res) => {
+        const r = await taskServices.listTasks(req);
+        return res.status(r.status).json(r);
+    },
+    getTask: async (req, res) => {
+        const r = await taskServices.getTask(req);
+        return res.status(r.status).json(r);
+    },
+    updateTask: async (req, res) => {
+        const r = await taskServices.updateTask(req);
+        return res.status(r.status).json(r);
+    },
+    deleteTask: async (req, res) => {
+        const r = await taskServices.deleteTask(req);
+        return res.status(r.status).json(r);
+    },
+};
+
+export default taskController;
+
+
+// ==========================================
+// File: src\middlewares\auth.middleware.js
+// ==========================================
+
+// src/middlewares/auth.middleware.js
+import jwt from "jsonwebtoken";
+import { ACCESS_TOKEN_SECRET } from "../common/constant/app.constant.js";
+import prisma from "../common/prisma/init.prisma.js";
+
+export const authMiddleware = {
+  // verifyToken giữ như cũ, chỉ nhắc lại cho đầy đủ
+  verifyToken: async (req, res, next) => {
+    try {
+      const authHeader =
+        req.headers.authorization || req.headers.Authorization;
+
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ message: "Thiếu token" });
+      }
+
+      const token = authHeader.split(" ")[1];
+      if (!token) {
+        return res.status(401).json({ message: "Token không hợp lệ" });
+      }
+
+      console.log("VERIFY TOKEN RAW:", token);
+
+      const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET);
+      console.log("DECODED JWT:", decoded);
+
+      const { aid } = decoded;
+
+      const acc = await prisma.account.findUnique({
+        where: { A_ID: aid },
+        include: {
+          Role: true,
+          Member: true,
+        },
+      });
+
+      if (!acc || acc.IsDeleted === true) {
+        return res.status(404).json({ message: "Tài khoản không tồn tại" });
+      }
+
+      req.user = {
+        aid: acc.A_ID,
+        roleId: acc.R_ID,
+        roleName: acc.Role?.R_Name,
+        departmentId: acc.Member?.D_ID || null,
+      };
+
+      return next();
+    } catch (e) {
+      console.error("JWT VERIFY ERROR:", e);
+      if (e.name === "TokenExpiredError") {
+        return res.status(401).json({ message: "Token hết hạn" });
+      }
+      return res.status(401).json({ message: "Token không hợp lệ" });
+    }
+  },
+
+  // cho tiện, vẫn giữ isAdmin
+  isAdmin: (req, res, next) => {
+    if (req.user?.roleName?.toLowerCase() === "admin" || req.user?.roleId === "R_001") {
+      return next();
+    }
+    return res.status(403).json({ message: "Không có quyền" });
+  },
+
+  // Authorize theo permissionKey
+  authorize:
+    (required) =>
+    (req, res, next) => {
+      const roleName = (req.user?.roleName || "").toLowerCase();
+      const roleId = req.user?.roleId;
+
+      if (!roleId) {
+        return res.status(403).json({ message: "Không có quyền" });
+      }
+
+      // admin (R_001) full quyền
+      if (roleId === "R_001" || roleName === "admin") {
+        return next();
+      }
+
+      // Map role -> list permission
+      const rolePermissions = {
+        admin: [
+    "DEPARTMENT_LIST",
+    "DEPARTMENT_CREATE",
+    "DEPARTMENT_UPDATE",
+    "DEPARTMENT_DELETE",
+  ],
+        // system: kỹ thuật
+        system: [
+          "DEPARTMENT_LIST",
+          "DEPARTMENT_CREATE",
+          "DEPARTMENT_UPDATE",
+          "DEPARTMENT_DELETE",
+        ],
+        // PMO
+        pmo: ["DEPARTMENT_LIST"],
+        // manager / leader / sếp
+        manager: ["DEPARTMENT_LIST"],
+        // SEP nếu cậu muốn cho xem danh sách
+        sep: ["DEPARTMENT_LIST"],
+        // staff (user) – không được list toàn bộ
+        user: [],
+      };
+
+      const perms = rolePermissions[roleName] || [];
+
+      // nếu role có quyền tương ứng
+      if (perms.includes(required)) {
+        return next();
+      }
+
+      return res.status(403).json({ message: "Không có quyền" });
+    },
+};
+
+export default authMiddleware;
+
+
+// ==========================================
+// File: src\routers\account.router.js
+// ==========================================
+
+// src/routers/account.router.js
+import express from "express";
+import { authMiddleware } from "../middlewares/auth.middleware.js";
+import accountController from "../controllers/account.controller.js";
+
+const accountRouter = express.Router();
+
+// F01 – Tạo tài khoản
+accountRouter.post(
+  "/",
+  authMiddleware.verifyToken,
+  authMiddleware.authorize("ACCOUNT_CREATE"),
+  accountController.createAccount
+);
+
+// (optional) list account
+accountRouter.get(
+  "/",
+  authMiddleware.verifyToken,
+  authMiddleware.authorize("ACCOUNT_LIST"),
+  accountController.listAccounts
+);
+
+// F05 – Khoá/Mở khoá tài khoản
+accountRouter.put(
+  "/:A_ID/status",
+  authMiddleware.verifyToken,
+  authMiddleware.authorize("ACCOUNT_STATUS"),
+  accountController.changeStatus
+);
+
+// F06 – Xoá tài khoản (soft delete)
+accountRouter.delete(
+  "/:A_ID",
+  authMiddleware.verifyToken,
+  authMiddleware.authorize("ACCOUNT_DELETE"),
+  accountController.softDelete
+);
+
+export default accountRouter;
+
+
+// ==========================================
+// File: src\routers\auth.router.js
+// ==========================================
+
+// src/routers/auth.router.js
+import express from "express";
+import authController from "../controllers/auth.controller.js";
+import { authMiddleware } from "../middlewares/auth.middleware.js";
+
+
+const authRouter = express.Router();
+
+// F02 – Login JWT
+authRouter.post("/login", authController.login);
+
+// F02 – /auth/me
+authRouter.get("/me", authMiddleware.verifyToken, authController.me);
+
+// F03 – Đổi mật khẩu
+authRouter.post(
+  "/change-password",
+  authMiddleware.verifyToken,
+  authController.changePassword
+);
+
+export default authRouter;
+
+
+// ==========================================
+// File: src\routers\dashboard.router.js
+// ==========================================
+
+import express from "express";
+import dashboardController from "../controllers/dashboard.controller.js";
+import authMiddleware from "../middlewares/auth.middleware.js";
+
+const dashboardRouter = express.Router();
+
+dashboardRouter.use(authMiddleware.verifyToken);
+
+dashboardRouter.get("/stats", dashboardController.getStats);
+
+export default dashboardRouter;
+
+
+// ==========================================
+// File: src\routers\department.router.js
+// ==========================================
+
+// src/routers/department.router.js
+import express from "express";
+import { authMiddleware } from "../middlewares/auth.middleware.js";
+import departmentController from "../controllers/department.controller.js";
+
+const departmentRouter = express.Router();
+
+// F07 – tạo phòng ban
+departmentRouter.post(
+  "/",
+  authMiddleware.verifyToken,
+  authMiddleware.authorize("DEPARTMENT_CREATE"),
+  departmentController.create
+);
+
+// F07 – danh sách phòng ban (admin + sếp + PMO + leader/system/sep)
+departmentRouter.get(
+  "/",
+  authMiddleware.verifyToken,
+  authMiddleware.authorize("DEPARTMENT_LIST"),
+  departmentController.list
+);
+
+// ✅ xem chi tiết 1 phòng ban
+// admin/PMO/manager/sep/system: xem được tất cả
+// staff(user): chỉ xem được phòng ban của chính mình
+departmentRouter.get(
+  "/:D_ID",
+  authMiddleware.verifyToken,
+  departmentController.detail
+);
+
+// F07 – cập nhật phòng ban
+departmentRouter.put(
+  "/:D_ID",
+  authMiddleware.verifyToken,
+  authMiddleware.authorize("DEPARTMENT_UPDATE"),
+  departmentController.update
+);
+
+// F07 – xoá mềm phòng ban
+departmentRouter.delete(
+  "/:D_ID",
+  authMiddleware.verifyToken,
+  authMiddleware.authorize("DEPARTMENT_DELETE"),
+  departmentController.softDelete
+);
+
+export default departmentRouter;
+
+
+// ==========================================
+// File: src\routers\department_me.router.js
+// ==========================================
+
+// src/routers/me.router.js
+import express from "express";
+import { authMiddleware } from "../middlewares/auth.middleware.js";
+import departmentController from "../controllers/department.controller.js";
+
+const meRouter = express.Router();
+
+// GET /api/v1/me/department
+meRouter.get(
+  "/department",
+  authMiddleware.verifyToken,
+  departmentController.myDepartment
+);
+
+export default meRouter;
+
+
+// ==========================================
+// File: src\routers\project.router.js
+// ==========================================
+
+import express from "express";
+import projectController from "../controllers/project.controller.js";
+import authMiddleware from "../middlewares/auth.middleware.js";
+
+const projectRouter = express.Router();
+
+// Apply auth middleware to all project routes
+projectRouter.use(authMiddleware.verifyToken);
+
+projectRouter.post("/", projectController.createProject);
+projectRouter.get("/", projectController.listProjects);
+projectRouter.get("/:id", projectController.getProject);
+projectRouter.put("/:id", projectController.updateProject);
+projectRouter.delete("/:id", projectController.deleteProject);
+
+export default projectRouter;
+
+
+// ==========================================
+// File: src\routers\root_router.js
+// ==========================================
+
+import express from "express";
+import authRouter from "./auth.router.js";
+import accountRouter from "./account.router.js";
+import departmentRouter from "./department.router.js";
+import meRouter from "./department_me.router.js";
+import projectRouter from "./project.router.js";
+import taskRouter from "./task.router.js";
+import dashboardRouter from "./dashboard.router.js";
+
+const rootRouter = express.Router();
+
+rootRouter.use("/auth", authRouter);
+rootRouter.use("/accounts", accountRouter);
+rootRouter.use("/departments", departmentRouter);
+rootRouter.use("/departments_me", meRouter);
+rootRouter.use("/projects", projectRouter);
+rootRouter.use("/tasks", taskRouter);
+rootRouter.use("/dashboard", dashboardRouter);
+
+export default rootRouter;
+
+
+// ==========================================
+// File: src\routers\task.router.js
+// ==========================================
+
+import express from "express";
+import taskController from "../controllers/task.controller.js";
+import authMiddleware from "../middlewares/auth.middleware.js";
+
+const taskRouter = express.Router();
+
+taskRouter.use(authMiddleware.verifyToken);
+
+taskRouter.post("/", taskController.createTask);
+taskRouter.get("/", taskController.listTasks);
+taskRouter.get("/:id", taskController.getTask);
+taskRouter.put("/:id", taskController.updateTask);
+taskRouter.delete("/:id", taskController.deleteTask);
+
+export default taskRouter;
+
+
+// ==========================================
+// File: src\services\account.services.js
+// ==========================================
+
+// src/services/account.services.js
+import prisma from "../common/prisma/init.prisma.js";
+import bcrypt from "bcryptjs";
+
+const genAccountId = () => {
+  return "A_" + Date.now().toString().slice(-3) + Math.floor(Math.random() * 10);
+};
+
+const genMemberId = () => {
+  return "M_" + Date.now().toString().slice(-3) + Math.floor(Math.random() * 10);
+};
+
+const accountServices = {
+  // ---------- F01: Tạo tài khoản ----------
+  createAccount: async (req) => {
+    try {
+      const actor = req.user; // admin đang login
+      const {
+        username,
+        password,
+        fullName,
+        email,
+        phoneNumber,
+        roleId,
+        departmentId,
+      } = req.body;
+
+      if (!username || !password || !email || !roleId || !departmentId) {
+        return { status: 400, message: "Thiếu trường bắt buộc" };
+      }
+
+      // check trùng username/email
+      const existing = await prisma.account.findFirst({
+        where: {
+          OR: [{ UserName: username }, { Email: email }],
+          IsDeleted: false,
+        },
+      });
+      if (existing) {
+        return { status: 400, message: "Username hoặc Email đã tồn tại" };
+      }
+
+      // tạo Member
+      const memberId = genMemberId();
+      const member = await prisma.member.create({
+        data: {
+          M_ID: memberId,
+          FullName: fullName || username,
+          PhoneNumber: phoneNumber || null,
+          D_ID: departmentId,
+          Status: "active",
+          IsDeleted: false,
+        },
+      });
+
+      // hash password
+      const hashed = await bcrypt.hash(password, 10);
+
+      // tạo Account
+      const accountId = genAccountId();
+      const account = await prisma.account.create({
+        data: {
+          A_ID: accountId,
+          UserName: username,
+          PassWord: hashed,
+          Email: email,
+          R_ID: roleId,
+          M_ID: member.M_ID,
+          Status: "active",
+          IsDeleted: false,
+        },
+        include: {
+          Role: true,
+          Member: true,
+        },
+      });
+
+      const { PassWord, ...safeAcc } = account;
+
+      return {
+        status: 201,
+        data: {
+          account: safeAcc,
+          createdBy: actor?.aid || null,
+        },
+      };
+    } catch (err) {
+      console.error("CREATE ACCOUNT ERROR:", err);
+      return { status: 500, message: "Lỗi server khi tạo tài khoản" };
+    }
+  },
+
+  // (optional) list accounts để admin xem
+  listAccounts: async () => {
+    const accounts = await prisma.account.findMany({
+      where: { IsDeleted: false },
+      include: { Role: true, Member: true },
+    });
+    const safe = accounts.map(({ PassWord, ...rest }) => rest);
+    return { status: 200, data: safe };
+  },
+
+  // ---------- F05: Khoá / Mở khoá ----------
+  changeStatus: async (req) => {
+    try {
+      const { aid: actorAid } = req.user;
+      const { A_ID } = req.params;
+      const { status, reason } = req.body; // status: 'locked' | 'active'
+
+      if (!A_ID || !status) {
+        return { status: 400, message: "Thiếu A_ID/status" };
+      }
+
+      const acc = await prisma.account.findUnique({
+        where: { A_ID },
+      });
+
+      if (!acc || acc.IsDeleted) {
+        return { status: 404, message: "Tài khoản không tồn tại" };
+      }
+
+      const updated = await prisma.account.update({
+        where: { A_ID },
+        data: {
+          Status: status,
+          // DB hiện tại không có cột reason, nên tạm thời chỉ log ra console
+        },
+        include: { Role: true, Member: true },
+      });
+
+      console.log("CHANGE STATUS reason:", reason);
+
+      const { PassWord, ...safeAcc } = updated;
+      return {
+        status: 200,
+        data: {
+          account: safeAcc,
+          changedBy: actorAid,
+        },
+      };
+    } catch (err) {
+      console.error("CHANGE STATUS ERROR:", err);
+      return { status: 500, message: "Lỗi server khi cập nhật trạng thái" };
+    }
+  },
+
+  // ---------- F06: Xoá tài khoản (soft delete) ----------
+  softDelete: async (req) => {
+    try {
+      const { aid: actorAid } = req.user;
+      const { A_ID } = req.params;
+
+      if (!A_ID) {
+        return { status: 400, message: "Thiếu A_ID" };
+      }
+
+      const acc = await prisma.account.findUnique({
+        where: { A_ID },
+      });
+
+      if (!acc || acc.IsDeleted) {
+        return { status: 404, message: "Tài khoản không tồn tại" };
+      }
+
+      const now = new Date();
+
+      const deleted = await prisma.account.update({
+        where: { A_ID },
+        data: {
+          IsDeleted: true,
+          Deleted_At: now,
+          Deleted_By: actorAid,
+          Status: "inactive",
+        },
+        include: { Role: true, Member: true },
+      });
+
+      const { PassWord, ...safeAcc } = deleted;
+      return {
+        status: 200,
+        data: safeAcc,
+      };
+    } catch (err) {
+      console.error("SOFT DELETE ERROR:", err);
+      return { status: 500, message: "Lỗi server khi xoá tài khoản" };
+    }
+  },
+};
+
+export default accountServices;
+  // ✔ Check quyền theo permission
+      // if (roleName !== "admin" && !rolePermissions.includes(required)) {
+      //   return res.status(403).json({ message: "Không có quyền" });
+      // }
+
+
+// ==========================================
+// File: src\services\auth.services.js
+// ==========================================
+
+// src/services/auth.services.js
+import prisma from "../common/prisma/init.prisma.js";
+import { tokenService } from "./token.services.js";
+import bcrypt from "bcryptjs";
+
+const authServices = {
+  // ---------- F02: Đăng nhập ----------
+  login: async (req) => {
+    const { username, password } = req.body;
+
+    console.log("LOGIN BODY:", { username, password });
+
+    if (!username || !password) {
+      return { status: 400, message: "Thiếu username/password" };
+    }
+
+    // ⚠️ DÙNG findUnique theo UserName (UserName là unique)
+    const acc = await prisma.account.findUnique({
+      where: {
+        UserName: username,
+      },
+      include: {
+        Role: true,   // đúng tên relation trong schema
+        Member: true, // đúng tên relation trong schema
+      },
+    });
+
+    console.log(
+      "ACCOUNT FOUND:",
+      acc
+        ? {
+            A_ID: acc.A_ID,
+            UserName: acc.UserName,
+            IsDeleted: acc.IsDeleted,
+            PassWordPreview: acc.PassWord.slice(0, 20) + "...",
+          }
+        : null
+    );
+
+    if (!acc || acc.IsDeleted === true) {
+      // không tìm thấy / đã xoá mềm
+      return { status: 401, message: "Sai tài khoản hoặc mật khẩu" };
+    }
+
+    // So sánh bcrypt
+    const isMatch = await bcrypt.compare(password, acc.PassWord);
+    console.log("BCRYPT MATCH:", isMatch);
+
+    if (!isMatch) {
+      return { status: 401, message: "Sai tài khoản hoặc mật khẩu" };
+    }
+
+    const tokens = tokenService.createTokens(acc);
+    const { PassWord, ...safeAcc } = acc;
+
+    return {
+      status: 200,
+      data: {
+        user: safeAcc,
+        tokens,
+      },
+    };
+  },
+
+  // ---------- F02: /auth/me ----------
+  me: async (req) => {
+    const { aid } = req.user;
+
+    const acc = await prisma.account.findUnique({
+      where: {
+        A_ID: aid,
+      },
+      include: {
+        Role: true,
+        Member: true,
+      },
+    });
+
+    if (!acc || acc.IsDeleted === true) {
+      return { status: 404, message: "Không tìm thấy tài khoản" };
+    }
+
+    const { PassWord, ...safeAcc } = acc;
+    return { status: 200, data: safeAcc };
+  },
+
+  // ---------- F03: Đổi mật khẩu ----------
+  changePassword: async (req) => {
+    const { aid } = req.user;
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return { status: 400, message: "Thiếu oldPassword/newPassword" };
+    }
+
+    const acc = await prisma.account.findUnique({
+      where: {
+        A_ID: aid,
+      },
+    });
+
+    if (!acc || acc.IsDeleted === true) {
+      return { status: 404, message: "Không tìm thấy tài khoản" };
+    }
+
+    const isMatch = await bcrypt.compare(oldPassword, acc.PassWord);
+    console.log("CHANGE PW – BCRYPT MATCH OLD:", isMatch);
+
+    if (!isMatch) {
+      return { status: 400, message: "Mật khẩu cũ không đúng" };
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.account.update({
+      where: { A_ID: aid },
+      data: { PassWord: hashed },
+    });
+
+    const changedAt = new Date().toISOString();
+
+    return {
+      status: 200,
+      data: { success: true, changedAt },
+    };
+  },
+};
+
+export default authServices;
+
+
+// ==========================================
+// File: src\services\dashboard.services.js
+// ==========================================
+
+import prisma from "../common/prisma/init.prisma.js";
+
+const dashboardServices = {
+    getStats: async (req) => {
+        try {
+            const actor = req.user;
+            const { roleName, departmentId, aid } = actor;
+
+            const role = (roleName || '').toLowerCase();
+
+            // 1. Define Scopes based on Role
+            // ADMIN: Global View (Read Only)
+            // PMO: Global View (Manage) -> "Theo dõi tiến độ toàn trung tâm" => Global
+            // LEADER: Department View -> "Xem danh sách công việc của team" => Department
+            // STAFF: Personal View -> "Xem My Tasks" => Personal Only
+
+            let isGlobal = false;
+            let isDepartment = false;
+            let isPersonal = false;
+
+            if (role === 'admin' || role === 'system' || role === 'pmo') {
+                isGlobal = true;
+            } else if (role === 'leader' || role === 'manager') {
+                isDepartment = true;
+            } else {
+                // Staff or others
+                isPersonal = true;
+            }
+
+            // 2. Build Query Filters
+            const projectWhere = { IsDeleted: false };
+            const taskWhere = { IsDeleted: false };
+            const memberWhere = { IsDeleted: false };
+
+            if (isDepartment) {
+                if (departmentId) {
+                    projectWhere.D_ID = departmentId;
+                    memberWhere.D_ID = departmentId;
+                    taskWhere.Project = {
+                        D_ID: departmentId
+                    };
+                } else {
+                    // Fallback if no department, return empty
+                    projectWhere.D_ID = 'NULL';
+                    taskWhere.T_ID = 'NULL';
+                }
+            } else if (isPersonal) {
+                // Staff doesn't see "Systems" stats usually, but if requested "Dashboard", 
+                // maybe they see meaningful "My Stats" and zeros for others?
+                // Or maybe they see nothing for Projects/Members.
+                // Let's hide Global Counts for Staff to avoid distraction/overload as per "Avoid overload" rule.
+                // We will return 0 for global counts.
+                projectWhere.P_ID = 'NULL';
+                memberWhere.M_ID = 'NULL'; // Don't show total members
+                taskWhere.Assigned_ID_M_ID = 'NULL'; // Just a placeholder, we will effectively zero out global task stats
+            }
+
+
+            // 3. Stats Execution
+            const now = new Date();
+
+            // Projects
+            const totalProjects = isPersonal ? 0 : await prisma.project.count({ where: projectWhere });
+            const activeProjects = isPersonal ? 0 : await prisma.project.count({
+                where: { ...projectWhere, Status: 'active' }
+            });
+
+            // Tasks (Global or Dept scope)
+            let chartTaskWhere = { ...taskWhere };
+
+            if (isPersonal) {
+                const currentAccount = await prisma.account.findUnique({
+                    where: { A_ID: aid },
+                    select: { M_ID: true }
+                });
+                if (currentAccount?.M_ID) {
+                    chartTaskWhere = {
+                        IsDeleted: false,
+                        Assigned_ID_M_ID: currentAccount.M_ID
+                    };
+                } else {
+                    chartTaskWhere = { T_ID: 'NULL' };
+                }
+            }
+
+            const totalTasks = await prisma.task.count({ where: chartTaskWhere });
+
+            // Overdue & Workload
+            let overdueTasks = 0;
+            let workload = [];
+
+            if (!isPersonal) {
+                // Calculate Overdue
+                overdueTasks = await prisma.task.count({
+                    where: {
+                        ...chartTaskWhere,
+                        Status: { notIn: ['done', 'completed', 'cancelled', 'deleted'] },
+                        Due_Date: { lt: now }
+                    }
+                });
+
+                // Calculate Workload (Tasks per Member) - For Leader/PMO
+                // This can be heavy, so we limit to top busiest or just list all if scope is Dept
+                if (isDepartment) {
+                    // Group tasks by Member in this Dept
+                    const workloadRaw = await prisma.task.groupBy({
+                        by: ['Assigned_ID_M_ID'],
+                        where: { ...chartTaskWhere, IsDeleted: false, Status: { notIn: ['done', 'completed'] } }, // Active tasks only
+                        _count: { T_ID: true },
+                        orderBy: { _count: { T_ID: 'desc' } }
+                    });
+
+                    // We need Member Names.
+                    // This is a bit complex with groupBy.
+                    // Alternative: simpler query for Member + Task Count
+                    const members = await prisma.member.findMany({
+                        where: memberWhere,
+                        select: {
+                            M_ID: true,
+                            FullName: true,
+                            _count: {
+                                select: { Task: { where: { IsDeleted: false, Status: { notIn: ['done', 'completed'] } } } }
+                            }
+                        }
+                    });
+
+                    workload = members.map(m => ({
+                        id: m.M_ID,
+                        name: m.FullName,
+                        activeTasks: m._count.Task
+                    })).sort((a, b) => b.activeTasks - a.activeTasks);
+                }
+            } else {
+                // Personal Overdue
+                overdueTasks = await prisma.task.count({
+                    where: {
+                        ...chartTaskWhere,
+                        Status: { notIn: ['done', 'completed', 'cancelled'] },
+                        Due_Date: { lt: now }
+                    }
+                });
+            }
+
+            // Status Breakdown
+            const taskByStatus = await prisma.task.groupBy({
+                by: ['Status'],
+                where: chartTaskWhere,
+                _count: {
+                    Status: true
+                }
+            });
+
+            const taskStats = taskByStatus.reduce((acc, curr) => {
+                acc[curr.Status || 'undefined'] = curr._count.Status;
+                return acc;
+            }, {});
+
+            // Members
+            const totalMembers = isPersonal ? 0 : await prisma.member.count({ where: memberWhere });
+
+            // 4. "My" Stats
+            // Fetch M_ID if not already fetched
+            let myM_ID = null;
+            // We might have fetched it above
+            if (isPersonal) {
+                // We fetched it implicitly or need to recall? 
+                // Let's just fetch again or optimize later. Prisma caches well enough.
+                // Actually let's use the same logic.
+            }
+
+            const currentAccount = await prisma.account.findUnique({
+                where: { A_ID: aid },
+                select: { M_ID: true }
+            });
+
+            let myTasksCount = 0;
+            let myPendingTasksCount = 0;
+
+            if (currentAccount?.M_ID) {
+                myTasksCount = await prisma.task.count({
+                    where: { Assigned_ID_M_ID: currentAccount.M_ID, IsDeleted: false }
+                });
+                myPendingTasksCount = await prisma.task.count({
+                    where: { Assigned_ID_M_ID: currentAccount.M_ID, Status: 'pending', IsDeleted: false }
+                });
+            }
+
+            return {
+                status: 200,
+                data: {
+                    role: role,
+                    scope: isGlobal ? 'global' : (isDepartment ? 'department' : 'personal'),
+                    projects: {
+                        total: totalProjects,
+                        active: activeProjects
+                    },
+                    tasks: {
+                        total: totalTasks,
+                        byStatus: taskStats,
+                        overdue: overdueTasks // [NEW] metrics
+                    },
+                    members: {
+                        total: totalMembers,
+                        workload: workload // [NEW] metrics (Leader only)
+                    },
+                    me: {
+                        assignedTasks: myTasksCount,
+                        pendingTasks: myPendingTasksCount
+                    }
+                }
+            };
+        } catch (err) {
+            console.error("DASHBOARD STATS ERROR:", err);
+            return { status: 500, message: "Server error getting dashboard stats" };
+        }
+    }
+};
+
+export default dashboardServices;
+
+
+// ==========================================
+// File: src\services\department.services.js
+// ==========================================
+
+// src/services/department.services.js
+import prisma from "../common/prisma/init.prisma.js";
+
+const genDepartmentId = () => {
+  return "D_" + Date.now().toString().slice(-3) + Math.floor(Math.random() * 10);
+};
+
+const departmentServices = {
+  // tạo phòng ban
+  createDepartment: async (req) => {
+    try {
+      const { aid: actorAid } = req.user;
+      const { name, parentId, status } = req.body; // status optional
+
+      if (!name) return { status: 400, message: "Thiếu tên phòng ban" };
+
+      const id = genDepartmentId();
+      const dep = await prisma.department.create({
+        data: {
+          D_ID: id,
+          D_Name: name,
+          Parent_D_ID: parentId || null,
+          Status: status || "active",
+          IsDeleted: false,
+        },
+      });
+
+      return {
+        status: 201,
+        data: {
+          department: dep,
+          createdBy: actorAid,
+        },
+      };
+    } catch (err) {
+      console.error("CREATE DEPARTMENT ERROR:", err);
+      return { status: 500, message: "Lỗi server khi tạo phòng ban" };
+    }
+  },
+
+  // cập nhật phòng ban
+  updateDepartment: async (req) => {
+    try {
+      const { D_ID } = req.params;
+      const { name, parentId, status } = req.body;
+
+      const dep = await prisma.department.findUnique({
+        where: { D_ID },
+      });
+      if (!dep || dep.IsDeleted) {
+        return { status: 404, message: "Phòng ban không tồn tại" };
+      }
+
+      const updated = await prisma.department.update({
+        where: { D_ID },
+        data: {
+          D_Name: name ?? dep.D_Name,
+          Parent_D_ID: parentId ?? dep.Parent_D_ID,
+          Status: status ?? dep.Status,
+        },
+      });
+
+      return { status: 200, data: updated };
+    } catch (err) {
+      console.error("UPDATE DEPARTMENT ERROR:", err);
+      return { status: 500, message: "Lỗi server khi cập nhật phòng ban" };
+    }
+  },
+
+  // xoá mềm phòng ban
+  softDeleteDepartment: async (req) => {
+    try {
+      const { aid: actorAid } = req.user;
+      const { D_ID } = req.params;
+
+      const dep = await prisma.department.findUnique({
+        where: { D_ID },
+      });
+      if (!dep || dep.IsDeleted) {
+        return { status: 404, message: "Phòng ban không tồn tại" };
+      }
+
+      const now = new Date();
+
+      const deleted = await prisma.department.update({
+        where: { D_ID },
+        data: {
+          IsDeleted: true,
+          Deleted_At: now,
+          Deleted_By: actorAid,
+          Status: "inactive",
+        },
+      });
+
+      return { status: 200, data: deleted };
+    } catch (err) {
+      console.error("DELETE DEPARTMENT ERROR:", err);
+      return { status: 500, message: "Lỗi server khi xoá phòng ban" };
+    }
+  },
+
+  // ✅ danh sách phòng ban
+  listDepartments: async () => {
+    try {
+      const deps = await prisma.department.findMany({
+        where: { IsDeleted: false },
+      });
+      return { status: 200, data: deps };
+    } catch (err) {
+      console.error("LIST DEPARTMENTS ERROR:", err);
+      return { status: 500, message: "Lỗi server khi lấy danh sách phòng ban" };
+    }
+  },
+
+  // ✅ chi tiết 1 phòng ban
+  getDepartmentById: async (req) => {
+    try {
+      const { D_ID } = req.params;
+      const roleName = (req.user?.roleName || "").toLowerCase();
+      const userDeptId = req.user?.departmentId;
+
+      const dep = await prisma.department.findUnique({
+        where: { D_ID },
+      });
+
+      if (!dep || dep.IsDeleted) {
+        return { status: 404, message: "Phòng ban không tồn tại" };
+      }
+
+      const elevatedRoles = ["admin", "system", "pmo", "manager", "sep"];
+
+      if (elevatedRoles.includes(roleName)) {
+        return { status: 200, data: dep };
+      }
+
+      if (roleName === "user") {
+        if (userDeptId && userDeptId === D_ID) {
+          return { status: 200, data: dep };
+        }
+        return {
+          status: 403,
+          message: "Không có quyền xem phòng ban này",
+        };
+      }
+
+      return { status: 403, message: "Không có quyền" };
+    } catch (err) {
+      console.error("GET DEPARTMENT BY ID ERROR:", err);
+      return { status: 500, message: "Lỗi server khi lấy phòng ban" };
+    }
+  },
+
+  // ✅ phòng ban của chính user
+  getMyDepartment: async (req) => {
+    try {
+      const userDeptId = req.user?.departmentId;
+
+      if (!userDeptId) {
+        return {
+          status: 404,
+          message: "Tài khoản chưa được gán phòng ban",
+        };
+      }
+
+      const dep = await prisma.department.findUnique({
+        where: { D_ID: userDeptId },
+      });
+
+      if (!dep || dep.IsDeleted) {
+        return { status: 404, message: "Phòng ban không tồn tại" };
+      }
+
+      return { status: 200, data: dep };
+    } catch (err) {
+      console.error("GET MY DEPARTMENT ERROR:", err);
+      return { status: 500, message: "Lỗi server khi lấy phòng ban" };
+    }
+  },
+};
+
+export default departmentServices;
+
+
+// ==========================================
+// File: src\services\project.services.js
+// ==========================================
+
+import prisma from "../common/prisma/init.prisma.js";
+
+const genProjectId = () => {
+    return "P_" + Date.now().toString().slice(-3) + Math.floor(Math.random() * 10);
+};
+
+const projectServices = {
+    // Create Project
+    createProject: async (req) => {
+        try {
+            const actor = req.user; // from auth middleware
+            const { name, departmentId, beginDate, endDate } = req.body;
+            const role = (actor.roleName || '').toLowerCase();
+
+            // PERMISSION CHECK
+            // Only PMO can create projects. 
+            // Admin: NO ("ADMIN KHÔNG tạo dự án")
+            // Leader: NO ("Leader KHÔNG tạo project")
+            // Staff: NO ("Staff KHÔNG tạo project")
+            if (role !== 'pmo') {
+                return { status: 403, message: `Access Denied: Role '${role}' cannot create projects. Only PMO allowed.` };
+            }
+
+            if (!name || !departmentId) {
+                return { status: 400, message: "Missing required fields: name, departmentId" };
+            }
+
+            // Check department existence
+            const dept = await prisma.department.findUnique({ where: { D_ID: departmentId } });
+            if (!dept) return { status: 404, message: "Department not found" };
+
+            const projectId = genProjectId();
+            const newProject = await prisma.project.create({
+                data: {
+                    P_ID: projectId,
+                    P_Name: name,
+                    D_ID: departmentId,
+                    Begin_Date: beginDate ? new Date(beginDate) : null,
+                    End_Date: endDate ? new Date(endDate) : null,
+                    Created_By_A_ID: actor?.aid,
+                    Status: "active",
+                    IsDeleted: false,
+                },
+            });
+
+            return { status: 201, data: newProject };
+        } catch (err) {
+            console.error("CREATE PROJECT ERROR:", err);
+            return { status: 500, message: "Server error creating project" };
+        }
+    },
+
+    // List Projects
+    listProjects: async (req) => {
+        try {
+            // Optional: filtering by Department or Status
+            const { departmentId, status } = req.query;
+            const where = { IsDeleted: false };
+            if (departmentId) where.D_ID = departmentId;
+            if (status) where.Status = status;
+
+            const projects = await prisma.project.findMany({
+                where,
+                include: { Department: true, Account: { select: { UserName: true } } }, // Created By
+                orderBy: { Begin_Date: 'desc' }
+            });
+
+            return { status: 200, data: projects };
+        } catch (err) {
+            console.error("LIST PROJECTS ERROR:", err);
+            return { status: 500, message: "Server error listing projects" };
+        }
+    },
+
+    // Get Project Detail
+    getProject: async (req) => {
+        try {
+            const { id } = req.params;
+            const project = await prisma.project.findUnique({
+                where: { P_ID: id },
+                include: { Department: true, Task: { where: { IsDeleted: false } } }
+            });
+
+            if (!project || project.IsDeleted) {
+                return { status: 404, message: "Project not found" };
+            }
+
+            return { status: 200, data: project };
+        } catch (err) {
+            console.error("GET PROJECT ERROR:", err);
+            return { status: 500, message: "Server error getting project" };
+        }
+    },
+
+    // Update Project
+    updateProject: async (req) => {
+        try {
+            const { id } = req.params;
+            const { name, departmentId, beginDate, endDate, status } = req.body;
+
+            const project = await prisma.project.findUnique({ where: { P_ID: id } });
+            if (!project || project.IsDeleted) {
+                return { status: 404, message: "Project not found" };
+            }
+
+            const data = {};
+            if (name) data.P_Name = name;
+            if (departmentId) data.D_ID = departmentId;
+            if (beginDate) data.Begin_Date = new Date(beginDate);
+            if (endDate) data.End_Date = new Date(endDate);
+            if (status) data.Status = status;
+
+            const updated = await prisma.project.update({
+                where: { P_ID: id },
+                data,
+            });
+
+            return { status: 200, data: updated };
+        } catch (err) {
+            console.error("UPDATE PROJECT ERROR:", err);
+            return { status: 500, message: "Server error updating project" };
+        }
+    },
+
+    // Soft Delete Project
+    deleteProject: async (req) => {
+        try {
+            const actor = req.user;
+            const { id } = req.params;
+
+            const project = await prisma.project.findUnique({ where: { P_ID: id } });
+            if (!project || project.IsDeleted) {
+                return { status: 404, message: "Project not found" };
+            }
+
+            const deleted = await prisma.project.update({
+                where: { P_ID: id },
+                data: {
+                    IsDeleted: true,
+                    Deleted_At: new Date(),
+                    Deleted_By: actor?.aid,
+                    Status: "deleted"
+                }
+            });
+
+            return { status: 200, data: deleted };
+        } catch (err) {
+            console.error("DELETE PROJECT ERROR:", err);
+            return { status: 500, message: "Server error deleting project" };
+        }
+    }
+};
+
+export default projectServices;
+
+
+// ==========================================
+// File: src\services\task.services.js
+// ==========================================
+
+import prisma from "../common/prisma/init.prisma.js";
+
+const genTaskId = () => {
+    return "T_" + Date.now().toString().slice(-3) + Math.floor(Math.random() * 10);
+};
+
+const taskServices = {
+    // Create Task
+    createTask: async (req) => {
+        try {
+            const actor = req.user;
+            const { title, description, beginDate, dueDate, priority, projectId, assignedTo } = req.body;
+            const role = (actor.roleName || '').toLowerCase();
+
+            // PERMISSION CHECK
+            // PMO: OK (Create Main Task)
+            // Leader: OK (Create Team Task)
+            // Admin: NO ("Không assign task", "Không tạo dự án") -> Assume NO Task creation too? "Không làm workload".
+            // Staff: NO ("Staff KHÔNG tạo main task", "Staff KHÔNG phân công ai")
+
+            // Allow 'pmo' and 'leader'/'manager'
+            const allowed = ['pmo', 'leader', 'manager'];
+            if (!allowed.includes(role)) {
+                return { status: 403, message: `Access Denied: Role '${role}' cannot create tasks.` };
+            }
+
+            if (!title || !projectId) {
+                return { status: 400, message: "Missing required fields: title, projectId" };
+            }
+
+            // Verify Project
+            const project = await prisma.project.findUnique({ where: { P_ID: projectId } });
+            if (!project || project.IsDeleted) return { status: 404, message: "Project not found" };
+
+            // Verify Member if assigned
+            if (assignedTo) {
+                const member = await prisma.member.findUnique({ where: { M_ID: assignedTo } });
+                if (!member || member.IsDeleted) return { status: 404, message: "Assigned member not found" };
+            }
+
+            const taskId = genTaskId();
+            const newTask = await prisma.task.create({
+                data: {
+                    T_ID: taskId,
+                    Title: title,
+                    Description: description,
+                    Begin_Date: beginDate ? new Date(beginDate) : null,
+                    Due_Date: dueDate ? new Date(dueDate) : null,
+                    Priority: priority, // High, Medium, Low
+                    P_ID: projectId,
+                    Assigned_ID_M_ID: assignedTo,
+                    Created_By_A_ID: actor?.aid,
+                    Status: "pending",
+                    IsDeleted: false,
+                },
+            });
+
+            return { status: 201, data: newTask };
+        } catch (err) {
+            console.error("CREATE TASK ERROR:", err);
+            return { status: 500, message: "Server error creating task" };
+        }
+    },
+
+    // List Tasks
+    listTasks: async (req) => {
+        try {
+            const { projectId, assignedTo, status } = req.query;
+            const where = { IsDeleted: false };
+
+            if (projectId) where.P_ID = projectId;
+            if (assignedTo) where.Assigned_ID_M_ID = assignedTo;
+            if (status) where.Status = status;
+
+            const tasks = await prisma.task.findMany({
+                where,
+                include: {
+                    Member: true, // Assigned Member
+                    Project: { select: { P_Name: true } },
+                    Account: { select: { UserName: true } } // Created By
+                },
+                orderBy: { Created_By_A_ID: 'desc' } // Just some order
+            });
+
+            return { status: 200, data: tasks };
+        } catch (err) {
+            console.error("LIST TASKS ERROR:", err);
+            return { status: 500, message: "Server error listing tasks" };
+        }
+    },
+
+    // Get Task
+    getTask: async (req) => {
+        try {
+            const { id } = req.params;
+            const task = await prisma.task.findUnique({
+                where: { T_ID: id },
+                include: { Member: true, Project: true, Task_Report: { where: { IsDeleted: false } } }
+            });
+
+            if (!task || task.IsDeleted) {
+                return { status: 404, message: "Task not found" };
+            }
+
+            return { status: 200, data: task };
+        } catch (err) {
+            console.error("GET TASK ERROR:", err);
+            return { status: 500, message: "Server error getting task" };
+        }
+    },
+
+    // Update Task
+    updateTask: async (req) => {
+        try {
+            const { id } = req.params;
+            const { title, description, beginDate, dueDate, priority, assignedTo, status } = req.body;
+
+            const task = await prisma.task.findUnique({ where: { T_ID: id } });
+            if (!task || task.IsDeleted) {
+                return { status: 404, message: "Task not found" };
+            }
+
+            const data = {};
+            if (title) data.Title = title;
+            if (description) data.Description = description;
+            if (beginDate) data.Begin_Date = new Date(beginDate);
+            if (dueDate) data.Due_Date = new Date(dueDate);
+            if (priority) data.Priority = priority;
+            if (assignedTo) data.Assigned_ID_M_ID = assignedTo;
+
+            if (status) {
+                data.Status = status;
+                if (status === 'done' || status === 'completed') {
+                    data.Complete_At = new Date();
+                }
+            }
+
+            const updated = await prisma.task.update({
+                where: { T_ID: id },
+                data,
+            });
+
+            return { status: 200, data: updated };
+        } catch (err) {
+            console.error("UPDATE TASK ERROR:", err);
+            return { status: 500, message: "Server error updating task" };
+        }
+    },
+
+    // Delete Task
+    deleteTask: async (req) => {
+        try {
+            const actor = req.user;
+            const { id } = req.params;
+
+            const task = await prisma.task.findUnique({ where: { T_ID: id } });
+            if (!task || task.IsDeleted) {
+                return { status: 404, message: "Task not found" };
+            }
+
+            const deleted = await prisma.task.update({
+                where: { T_ID: id },
+                data: {
+                    IsDeleted: true,
+                    Deleted_At: new Date(),
+                    Deleted_By: actor?.aid,
+                    Status: "deleted"
+                }
+            });
+
+            return { status: 200, data: deleted };
+        } catch (err) {
+            console.error("DELETE TASK ERROR:", err);
+            return { status: 500, message: "Server error deleting task" };
+        }
+    }
+};
+
+export default taskServices;
+
+
+// ==========================================
+// File: src\services\token.services.js
+// ==========================================
+
+import jwt from "jsonwebtoken";
+import {
+  ACCESS_TOKEN_SECRET,
+  ACCESS_TOKEN_EXPIRES_IN,
+  REFRESH_TOKEN_SECRET,
+  REFRESH_TOKEN_EXPIRES_IN,
+} from "../common/constant/app.constant.js";
+
+export const tokenService = {
+  createTokens: (acc) => {
+    const payload = {
+      aid: acc.A_ID,
+      roleId: acc.R_ID,
+      roleName: acc.Role?.R_Name,
+      departmentId: acc.Member?.D_ID || null,
+    };
+
+    const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, {
+      expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+    });
+    const refreshToken = jwt.sign(payload, REFRESH_TOKEN_SECRET, {
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+    });
+
+    return { accessToken, refreshToken };
+  },
+};
+export default tokenService;

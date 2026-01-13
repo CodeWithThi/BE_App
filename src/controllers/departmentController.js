@@ -1,5 +1,5 @@
 // src/controllers/department.controller.js
-import departmentServices from "../services/department.services.js";
+import departmentServices from "../services/departmentService.js";
 
 const departmentController = {
   create: async (req, res) => {

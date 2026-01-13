@@ -18,6 +18,8 @@ model Account {
   Deleted_At                                       DateTime?     @db.DateTime(0)
   Deleted_By                                       String?       @db.VarChar(10)
   IsDeleted                                        Boolean       @default(false)
+  Last_Active                                      DateTime?     @db.DateTime(0)
+  Avatar                                           String?       @db.VarChar(255)
   Member                                           Member?       @relation(fields: [M_ID], references: [M_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Account_Member")
   Role                                             Role          @relation(fields: [R_ID], references: [R_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Account_Role")
   Project                                          Project[]
@@ -118,6 +120,7 @@ model Task {
   P_ID             String        @db.VarChar(10)
   Assigned_ID_M_ID String?       @db.VarChar(10)
   Created_By_A_ID  String?       @db.VarChar(10)
+  Parent_T_ID      String?       @db.VarChar(10)
   Status           String?       @db.VarChar(30)
   Deleted_At       DateTime?     @db.DateTime(0)
   Deleted_By       String?       @db.VarChar(10)
@@ -125,11 +128,14 @@ model Task {
   Member           Member?       @relation(fields: [Assigned_ID_M_ID], references: [M_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_AssignedMember")
   Account          Account?      @relation(fields: [Created_By_A_ID], references: [A_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_CreatedBy")
   Project          Project       @relation(fields: [P_ID], references: [P_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_Project")
+  ParentTask       Task?         @relation("TaskSubtasks", fields: [Parent_T_ID], references: [T_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_ParentTask")
+  Subtasks         Task[]        @relation("TaskSubtasks")
   Task_Report      Task_Report[]
 
   @@index([Assigned_ID_M_ID], map: "FK_Task_AssignedMember")
   @@index([Created_By_A_ID], map: "FK_Task_CreatedBy")
   @@index([P_ID], map: "FK_Task_Project")
+  @@index([Parent_T_ID], map: "FK_Task_ParentTask")
 }
 
 model Task_Report {

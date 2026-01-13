@@ -1,6 +1,6 @@
-// src/services/auth.services.js
-import prisma from "../common/prisma/init.prisma.js";
-import { tokenService } from "./token.services.js";
+// src/services/authService.js
+import prisma from "../config/database.js";
+import { tokenService } from "./tokenService.js";
 import bcrypt from "bcryptjs";
 
 const authServices = {

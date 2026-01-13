@@ -1,7 +1,7 @@
-// src/middlewares/auth.middleware.js
+// src/middlewares/authMiddleware.js
 import jwt from "jsonwebtoken";
 import { ACCESS_TOKEN_SECRET } from "../common/constant/app.constant.js";
-import prisma from "../common/prisma/init.prisma.js";
+import prisma from "../config/database.js";
 
 export const authMiddleware = {
   // verifyToken giữ như cũ, chỉ nhắc lại cho đầy đủ
@@ -45,6 +45,12 @@ export const authMiddleware = {
         departmentId: acc.Member?.D_ID || null,
       };
 
+      // Update Last_Active timestamp (non-blocking)
+      prisma.account.update({
+        where: { A_ID: acc.A_ID },
+        data: { Last_Active: new Date() }
+      }).catch(err => console.error('Failed to update Last_Active:', err));
+
       return next();
     } catch (e) {
       console.error("JWT VERIFY ERROR:", e);
@@ -66,53 +72,54 @@ export const authMiddleware = {
   // Authorize theo permissionKey
   authorize:
     (required) =>
-    (req, res, next) => {
-      const roleName = (req.user?.roleName || "").toLowerCase();
-      const roleId = req.user?.roleId;
+      (req, res, next) => {
+        const roleName = (req.user?.roleName || "").toLowerCase();
+        const roleId = req.user?.roleId;
 
-      if (!roleId) {
+        if (!roleId) {
+          return res.status(403).json({ message: "Không có quyền" });
+        }
+
+        // admin (R_001) full quyền
+        if (roleId === "R_001" || roleName === "admin") {
+          return next();
+        }
+
+        // Map role -> list permission
+        const rolePermissions = {
+          admin: [
+            "DEPARTMENT_LIST",
+            "DEPARTMENT_CREATE",
+            "DEPARTMENT_UPDATE",
+            "DEPARTMENT_DELETE",
+          ],
+          // system: kỹ thuật
+          system: [
+            "DEPARTMENT_LIST",
+            "DEPARTMENT_CREATE",
+            "DEPARTMENT_UPDATE",
+            "DEPARTMENT_DELETE",
+          ],
+          // PMO
+          pmo: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
+          // manager / leader / sếp
+          manager: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
+          leader: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
+          // SEP nếu cậu muốn cho xem danh sách
+          sep: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
+          // staff (user) – không được list toàn bộ
+          user: [],
+        };
+
+        const perms = rolePermissions[roleName] || [];
+
+        // nếu role có quyền tương ứng
+        if (perms.includes(required)) {
+          return next();
+        }
+
         return res.status(403).json({ message: "Không có quyền" });
-      }
-
-      // admin (R_001) full quyền
-      if (roleId === "R_001" || roleName === "admin") {
-        return next();
-      }
-
-      // Map role -> list permission
-      const rolePermissions = {
-        admin: [
-    "DEPARTMENT_LIST",
-    "DEPARTMENT_CREATE",
-    "DEPARTMENT_UPDATE",
-    "DEPARTMENT_DELETE",
-  ],
-        // system: kỹ thuật
-        system: [
-          "DEPARTMENT_LIST",
-          "DEPARTMENT_CREATE",
-          "DEPARTMENT_UPDATE",
-          "DEPARTMENT_DELETE",
-        ],
-        // PMO
-        pmo: ["DEPARTMENT_LIST"],
-        // manager / leader / sếp
-        manager: ["DEPARTMENT_LIST"],
-        // SEP nếu cậu muốn cho xem danh sách
-        sep: ["DEPARTMENT_LIST"],
-        // staff (user) – không được list toàn bộ
-        user: [],
-      };
-
-      const perms = rolePermissions[roleName] || [];
-
-      // nếu role có quyền tương ứng
-      if (perms.includes(required)) {
-        return next();
-      }
-
-      return res.status(403).json({ message: "Không có quyền" });
-    },
+      },
 };
 
 export default authMiddleware;

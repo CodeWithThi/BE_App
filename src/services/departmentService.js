@@ -1,5 +1,5 @@
-// src/services/department.services.js
-import prisma from "../common/prisma/init.prisma.js";
+// src/services/departmentService.js
+import prisma from "../config/database.js";
 
 const genDepartmentId = () => {
   return "D_" + Date.now().toString().slice(-3) + Math.floor(Math.random() * 10);
@@ -10,11 +10,27 @@ const departmentServices = {
   createDepartment: async (req) => {
     try {
       const { aid: actorAid } = req.user;
-      const { name, parentId, status } = req.body; // status optional
+      const { name, parentId, status, id: providedId } = req.body; // status, id optional
 
       if (!name) return { status: 400, message: "Thiếu tên phòng ban" };
 
-      const id = genDepartmentId();
+      // STRICT UNIQUE CHECK
+      const existingName = await prisma.department.findFirst({
+        where: { D_Name: name, IsDeleted: false }
+      });
+      if (existingName) {
+        return { status: 400, message: `Tên phòng ban '${name}' đã tồn tại. Vui lòng chọn tên khác.` };
+      }
+
+      // If ID provided, check uniqueness
+      if (providedId) {
+        const existingId = await prisma.department.findUnique({ where: { D_ID: providedId } });
+        if (existingId) {
+          return { status: 400, message: `Mã phòng ban '${providedId}' đã tồn tại.` };
+        }
+      }
+
+      const id = providedId || genDepartmentId();
       const dep = await prisma.department.create({
         data: {
           D_ID: id,
@@ -104,6 +120,11 @@ const departmentServices = {
     try {
       const deps = await prisma.department.findMany({
         where: { IsDeleted: false },
+        include: {
+          _count: {
+            select: { Member: true, Project: true }
+          }
+        }
       });
       return { status: 200, data: deps };
     } catch (err) {

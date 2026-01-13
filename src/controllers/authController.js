@@ -1,5 +1,5 @@
 // src/controllers/auth.controller.js
-import authServices from "../services/auth.services.js";
+import authServices from "../services/authService.js";
 
 const authController = {
   login: async (req, res) => {

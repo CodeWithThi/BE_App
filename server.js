@@ -9,6 +9,9 @@ app.use(express.json());
 // tất cả API v1
 app.use("/api/v1", rootRouter);
 
+// Serve static files (avatars)
+app.use(express.static('public'));
+
 const port = 3069;
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);

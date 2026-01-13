@@ -1,8 +1,13 @@
 import express from "express";
-import authRouter from "./auth.router.js";
-import accountRouter from "./account.router.js";
-import departmentRouter from "./department.router.js";
-import meRouter from "./department_me.router.js";
+import authRouter from "./auth.js";
+import accountRouter from "./account.js";
+import departmentRouter from "./department.js";
+import meRouter from "./department_me.js";
+import projectRouter from "./project.js";
+import taskRouter from "./task.js";
+import dashboardRouter from "./dashboard.js";
+import settingsRouter from "./settings.js";
+import uploadRouter from "./upload.js";
 
 const rootRouter = express.Router();
 
@@ -10,5 +15,10 @@ rootRouter.use("/auth", authRouter);
 rootRouter.use("/accounts", accountRouter);
 rootRouter.use("/departments", departmentRouter);
 rootRouter.use("/departments_me", meRouter);
+rootRouter.use("/projects", projectRouter);
+rootRouter.use("/tasks", taskRouter);
+rootRouter.use("/dashboard", dashboardRouter);
+rootRouter.use("/settings", settingsRouter);
+rootRouter.use("/upload", uploadRouter);
 
 export default rootRouter;
