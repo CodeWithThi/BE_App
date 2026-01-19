@@ -53,6 +53,7 @@ const projectServices = {
                 data: {
                     P_ID: projectId,
                     P_Name: name,
+                    P_Description: req.body.description || null,
                     D_ID: departmentId,
                     Begin_Date: beginDate ? new Date(beginDate) : null,
                     End_Date: endDate ? new Date(endDate) : null,
@@ -134,10 +135,12 @@ const projectServices = {
 
             const data = {};
             if (name) data.P_Name = name;
+            if (req.body.description) data.P_Description = req.body.description; // Update description
             if (departmentId) data.D_ID = departmentId;
             if (beginDate) data.Begin_Date = new Date(beginDate);
             if (endDate) data.End_Date = new Date(endDate);
             if (status) data.Status = status;
+            if (req.body.managerId) data.Created_By_A_ID = req.body.managerId; // Allow updating manager (Created_By)
 
             const updated = await prisma.project.update({
                 where: { P_ID: id },

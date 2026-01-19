@@ -26,6 +26,7 @@ model Account {
   Task                                             Task[]
   Task_Report_Task_Report_Created_By_A_IDToAccount Task_Report[] @relation("Task_Report_Created_By_A_IDToAccount")
   Task_Report_Task_Report_Reporter_A_IDToAccount   Task_Report[] @relation("Task_Report_Reporter_A_IDToAccount")
+  TaskComments                                     TaskComment[]
 
   @@index([M_ID], map: "FK_Account_Member")
   @@index([R_ID], map: "FK_Account_Role")
@@ -48,19 +49,20 @@ model Department {
 }
 
 model Member {
-  M_ID        String     @id @db.VarChar(10)
-  FullName    String     @db.VarChar(200)
-  PhoneNumber String?    @db.VarChar(30)
-  BirthDate   DateTime?  @db.Date
-  JoinDate    DateTime?  @db.Date
-  D_ID        String     @db.VarChar(10)
-  Status      String?    @db.VarChar(30)
-  Deleted_At  DateTime?  @db.DateTime(0)
-  Deleted_By  String?    @db.VarChar(10)
-  IsDeleted   Boolean    @default(false)
+  M_ID        String        @id @db.VarChar(10)
+  FullName    String        @db.VarChar(200)
+  PhoneNumber String?       @db.VarChar(30)
+  BirthDate   DateTime?     @db.Date
+  JoinDate    DateTime?     @db.Date
+  D_ID        String        @db.VarChar(10)
+  Status      String?       @db.VarChar(30)
+  Deleted_At  DateTime?     @db.DateTime(0)
+  Deleted_By  String?       @db.VarChar(10)
+  IsDeleted   Boolean       @default(false)
   Account     Account[]
-  Department  Department @relation(fields: [D_ID], references: [D_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Member_Department")
+  Department  Department    @relation(fields: [D_ID], references: [D_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Member_Department")
   Task        Task[]
+  Task_Member Task_Member[]
 
   @@index([D_ID], map: "FK_Member_Department")
 }
@@ -76,6 +78,7 @@ model Project {
   P_ID            String     @id @db.VarChar(10)
   D_ID            String     @db.VarChar(10)
   P_Name          String     @db.VarChar(200)
+  P_Description   String?    @db.VarChar(500)
   Begin_Date      DateTime?  @db.Date
   End_Date        DateTime?  @db.Date
   Created_By_A_ID String?    @db.VarChar(10)
@@ -127,15 +130,59 @@ model Task {
   IsDeleted        Boolean       @default(false)
   Member           Member?       @relation(fields: [Assigned_ID_M_ID], references: [M_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_AssignedMember")
   Account          Account?      @relation(fields: [Created_By_A_ID], references: [A_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_CreatedBy")
-  Project          Project       @relation(fields: [P_ID], references: [P_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_Project")
   ParentTask       Task?         @relation("TaskSubtasks", fields: [Parent_T_ID], references: [T_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_ParentTask")
   Subtasks         Task[]        @relation("TaskSubtasks")
+  Project          Project       @relation(fields: [P_ID], references: [P_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_Project")
+  Task_Member      Task_Member[]
   Task_Report      Task_Report[]
+  ChecklistItems   ChecklistItem[]
+  Attachments      Attachment[]
+  Task_Labels      Task_Label[]
+  TaskComments     TaskComment[]
 
   @@index([Assigned_ID_M_ID], map: "FK_Task_AssignedMember")
   @@index([Created_By_A_ID], map: "FK_Task_CreatedBy")
   @@index([P_ID], map: "FK_Task_Project")
   @@index([Parent_T_ID], map: "FK_Task_ParentTask")
+}
+
+model Label {
+  L_ID        String       @id @default(uuid()) @db.VarChar(36)
+  Name        String       @db.VarChar(100)
+  Color       String       @db.VarChar(20)
+  Task_Labels Task_Label[]
+}
+
+model Task_Label {
+  T_ID  String @db.VarChar(10)
+  L_ID  String @db.VarChar(36)
+  Task  Task   @relation(fields: [T_ID], references: [T_ID], onDelete: Cascade)
+  Label Label  @relation(fields: [L_ID], references: [L_ID], onDelete: Cascade)
+
+  @@id([T_ID, L_ID])
+  @@index([L_ID], map: "FK_TL_Label")
+  @@index([T_ID], map: "FK_TL_Task")
+}
+
+model ChecklistItem {
+  CL_ID       String   @id @default(uuid()) @db.VarChar(36)
+  Content     String   @db.VarChar(255)
+  IsCompleted Boolean  @default(false)
+  T_ID        String   @db.VarChar(10)
+  Task        Task     @relation(fields: [T_ID], references: [T_ID], onDelete: Cascade)
+
+  @@index([T_ID], map: "FK_CLI_Task")
+}
+
+model Attachment {
+  AT_ID      String   @id @default(uuid()) @db.VarChar(36)
+  FileName   String   @db.VarChar(255)
+  FileUrl    String   @db.Text
+  UploadDate DateTime @default(now())
+  T_ID       String   @db.VarChar(10)
+  Task       Task     @relation(fields: [T_ID], references: [T_ID], onDelete: Cascade)
+
+  @@index([T_ID], map: "FK_ATT_Task")
 }
 
 model Task_Report {
@@ -160,4 +207,31 @@ model Task_Report {
   @@index([Created_By_A_ID], map: "FK_TR_CreatedBy")
   @@index([Reporter_A_ID], map: "FK_TR_Reporter")
   @@index([T_ID], map: "FK_TR_Task")
+}
+
+model Task_Member {
+  TM_ID         Int      @id @default(autoincrement())
+  T_ID          String   @db.VarChar(10)
+  M_ID          String   @db.VarChar(10)
+  Role          String?  @default("member") @db.VarChar(50)
+  Added_At      DateTime @default(now()) @db.DateTime(0)
+  Added_By_A_ID String?  @db.VarChar(10)
+  Member        Member   @relation(fields: [M_ID], references: [M_ID], onDelete: Cascade, onUpdate: NoAction, map: "FK_TM_Member")
+  Task          Task     @relation(fields: [T_ID], references: [T_ID], onDelete: Cascade, onUpdate: NoAction, map: "FK_TM_Task")
+
+  @@unique([T_ID, M_ID], map: "unique_task_member")
+  @@index([T_ID], map: "FK_TM_Task")
+}
+
+model TaskComment {
+  TC_ID      String   @id @default(uuid()) @db.VarChar(36)
+  Content    String   @db.Text
+  Created_At DateTime @default(now())
+  T_ID       String   @db.VarChar(10)
+  A_ID       String   @db.VarChar(10)
+  Task       Task     @relation(fields: [T_ID], references: [T_ID], onDelete: Cascade)
+  Account    Account  @relation(fields: [A_ID], references: [A_ID], onDelete: Cascade)
+
+  @@index([T_ID], map: "FK_TC_Task")
+  @@index([A_ID], map: "FK_TC_Account")
 }

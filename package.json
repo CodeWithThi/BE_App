@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --import=extensionless/register server.js",
+    "dev": "npx prisma generate && nodemon --import=extensionless/register server.js",
     "start": "node --import=extensionless/register server.js"
   },
   "author": "",

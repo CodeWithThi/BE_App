@@ -102,11 +102,10 @@ export const authMiddleware = {
           ],
           // PMO
           pmo: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
-          // manager / leader / sếp
+          // manager / leader / director (sếp)
           manager: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
           leader: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
-          // SEP nếu cậu muốn cho xem danh sách
-          sep: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
+          director: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
           // staff (user) – không được list toàn bộ
           user: [],
         };
