@@ -19,4 +19,11 @@ authRouter.post(
   authController.changePassword
 );
 
+// F04 – Quên mật khẩu (gửi email reset)
+authRouter.post("/forgot-password", authController.forgotPassword);
+
+// F05 – Đặt lại mật khẩu (với token)
+authRouter.post("/reset-password", authController.resetPassword);
+
 export default authRouter;
+

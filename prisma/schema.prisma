@@ -20,6 +20,8 @@ model Account {
   IsDeleted                                        Boolean       @default(false)
   Last_Active                                      DateTime?     @db.DateTime(0)
   Avatar                                           String?       @db.VarChar(255)
+  ResetToken                                       String?       @db.VarChar(255)
+  ResetTokenExpires                                DateTime?     @db.DateTime(0)
   Member                                           Member?       @relation(fields: [M_ID], references: [M_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Account_Member")
   Role                                             Role          @relation(fields: [R_ID], references: [R_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Account_Role")
   Project                                          Project[]
