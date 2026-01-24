@@ -91,7 +91,11 @@ const projectServices = {
 
             const projects = await prisma.project.findMany({
                 where,
-                include: { Department: true, Account: { select: { UserName: true } } }, // Created By
+                include: {
+                    Department: true,
+                    Account: { select: { UserName: true } },
+                    Task: { select: { Status: true } }
+                }, // Created By
                 orderBy: { Begin_Date: 'desc' }
             });
 

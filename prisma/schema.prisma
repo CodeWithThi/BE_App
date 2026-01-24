@@ -29,9 +29,41 @@ model Account {
   Task_Report_Task_Report_Created_By_A_IDToAccount Task_Report[] @relation("Task_Report_Created_By_A_IDToAccount")
   Task_Report_Task_Report_Reporter_A_IDToAccount   Task_Report[] @relation("Task_Report_Reporter_A_IDToAccount")
   TaskComments                                     TaskComment[]
+  NotificationsReceived                            Notification[] @relation("NotificationRecipient")
+  NotificationsSent                                Notification[] @relation("NotificationSender")
+  SystemLogs                                       SystemLog[]
 
   @@index([M_ID], map: "FK_Account_Member")
   @@index([R_ID], map: "FK_Account_Role")
+}
+
+// Notification model for system notifications
+model Notification {
+  N_ID        String    @id @db.VarChar(20)
+  Type        String    @db.VarChar(50)  // task_assigned, task_approved, deadline_changed, overdue, comment, file_attached
+  Message     String    @db.VarChar(500)
+  IsRead      Boolean   @default(false)
+  CreatedAt   DateTime  @default(now()) @db.DateTime(0)
+  
+  // Recipient (required)
+  RecipientId String    @db.VarChar(10)
+  Recipient   Account   @relation("NotificationRecipient", fields: [RecipientId], references: [A_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Notification_Recipient")
+  
+  // Sender (optional - system notifications have no sender)
+  SenderId    String?   @db.VarChar(10)
+  Sender      Account?  @relation("NotificationSender", fields: [SenderId], references: [A_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Notification_Sender")
+  
+  // Related entities (optional)
+  TaskId      String?   @db.VarChar(10)
+  Task        Task?     @relation(fields: [TaskId], references: [T_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Notification_Task")
+  ProjectId   String?   @db.VarChar(10)
+  Project     Project?  @relation(fields: [ProjectId], references: [P_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Notification_Project")
+
+  @@index([RecipientId], map: "FK_Notification_Recipient")
+  @@index([SenderId], map: "FK_Notification_Sender")
+  @@index([TaskId], map: "FK_Notification_Task")
+  @@index([ProjectId], map: "FK_Notification_Project")
+  @@index([CreatedAt])
 }
 
 model Department {
@@ -91,6 +123,7 @@ model Project {
   Account         Account?   @relation(fields: [Created_By_A_ID], references: [A_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Project_CreatedBy")
   Department      Department @relation(fields: [D_ID], references: [D_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Project_Department")
   Task            Task[]
+  Notifications   Notification[]
 
   @@index([Created_By_A_ID], map: "FK_Project_CreatedBy")
   @@index([D_ID], map: "FK_Project_Department")
@@ -141,6 +174,7 @@ model Task {
   Attachments      Attachment[]
   Task_Labels      Task_Label[]
   TaskComments     TaskComment[]
+  Notifications    Notification[]
 
   @@index([Assigned_ID_M_ID], map: "FK_Task_AssignedMember")
   @@index([Created_By_A_ID], map: "FK_Task_CreatedBy")
@@ -236,4 +270,20 @@ model TaskComment {
 
   @@index([T_ID], map: "FK_TC_Task")
   @@index([A_ID], map: "FK_TC_Account")
+}
+
+model SystemLog {
+  LogID       String   @id @default(uuid()) @db.VarChar(36)
+  Action      String   @db.VarChar(50)
+  Message     String   @db.VarChar(500)
+  CreatedAt   DateTime @default(now()) @db.DateTime(0)
+  ActorId     String   @db.VarChar(10)
+  TargetType  String?  @db.VarChar(50)
+  TargetId    String?  @db.VarChar(50)
+  
+  Actor       Account  @relation(fields: [ActorId], references: [A_ID], onDelete: Cascade)
+
+  @@index([ActorId])
+  @@index([Action])
+  @@index([CreatedAt])
 }

@@ -63,7 +63,18 @@ export const authMiddleware = {
 
   // cho tiện, vẫn giữ isAdmin
   isAdmin: (req, res, next) => {
-    if (req.user?.roleName?.toLowerCase() === "admin" || req.user?.roleId === "R_001") {
+    const roleName = (req.user?.roleName || "").toLowerCase();
+    const roleId = req.user?.roleId;
+
+    // Check various admin role names
+    const isAdminRole =
+      roleId === "R_001" ||
+      roleName === "admin" ||
+      roleName.includes("admin") ||
+      roleName === "admin hệ thống" ||
+      roleName === "admin system";
+
+    if (isAdminRole) {
       return next();
     }
     return res.status(403).json({ message: "Không có quyền" });
@@ -80,8 +91,15 @@ export const authMiddleware = {
           return res.status(403).json({ message: "Không có quyền" });
         }
 
-        // admin (R_001) full quyền
-        if (roleId === "R_001" || roleName === "admin") {
+        // admin (R_001 or any admin-like role) full quyền
+        const isAdminRole =
+          roleId === "R_001" ||
+          roleName === "admin" ||
+          roleName.includes("admin") ||
+          roleName === "admin hệ thống" ||
+          roleName === "admin system";
+
+        if (isAdminRole) {
           return next();
         }
 
@@ -92,6 +110,11 @@ export const authMiddleware = {
             "DEPARTMENT_CREATE",
             "DEPARTMENT_UPDATE",
             "DEPARTMENT_DELETE",
+            "ACCOUNT_LIST",
+            "ACCOUNT_CREATE",
+            "ACCOUNT_UPDATE",
+            "ACCOUNT_DELETE",
+            "ACCOUNT_STATUS",
           ],
           // system: kỹ thuật
           system: [
@@ -99,6 +122,11 @@ export const authMiddleware = {
             "DEPARTMENT_CREATE",
             "DEPARTMENT_UPDATE",
             "DEPARTMENT_DELETE",
+            "ACCOUNT_LIST",
+            "ACCOUNT_CREATE",
+            "ACCOUNT_UPDATE",
+            "ACCOUNT_DELETE",
+            "ACCOUNT_STATUS",
           ],
           // PMO
           pmo: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
@@ -108,6 +136,7 @@ export const authMiddleware = {
           director: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
           // staff (user) – không được list toàn bộ
           user: [],
+          staff: [],
         };
 
         const perms = rolePermissions[roleName] || [];

@@ -53,6 +53,18 @@ const authServices = {
     const tokens = tokenService.createTokens(acc);
     const { PassWord, ...safeAcc } = acc;
 
+    // Log the login action
+    // We import logically at top, but for replace convenience we might use dynamic import or ensure import exists.
+    // Let's add top level import if possible, or use dynamic import inside to avoid large change.
+    // Dynamic import is safer for partial file replacement contexts if top is far away, but here we can just do it.
+    // Better: Add top import in a separate tool call if needed, or assume I can add it if I see the file top.
+    // I see the file top in context below (lines 1-4).
+
+    // Actually, I'll use dynamic import to be safe and lazy, or just add the import at the top in a separate chunk?
+    // Let's just use dynamic import for the service to avoid cyclic deps issues often found in node (though services usually OK).
+    const logService = (await import("./systemLogService.js")).default;
+    logService.createLog('login', safeAcc.A_ID, `User ${safeAcc.UserName} logged in`, 'Account', safeAcc.A_ID);
+
     return {
       status: 200,
       data: {

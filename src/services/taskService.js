@@ -1,4 +1,5 @@
 import prisma from "../config/database.js";
+import { createNotification } from "./notificationService.js";
 
 const genTaskId = () => {
     return "T_" + Date.now().toString().slice(-3) + Math.floor(Math.random() * 10);
@@ -18,7 +19,7 @@ const taskServices = {
             console.log("DEBUG CREATE TASK - RoleName:", role, "RoleID:", roleId);
 
             // PERMISSION CHECK
-            const allowedRoles = ['pmo', 'leader', 'manager', 'admin', 'system admin', 'director', 'tp', 'qa'];
+            const allowedRoles = ['leader', 'manager', 'admin', 'system admin', 'director', 'tp', 'qa'];
             const allowedRoleIds = ['R_001', 'R_002', 'R_003', 'R_004', 'R_005'];
 
             const isAllowed = allowedRoles.some(r => role.includes(r)) || allowedRoleIds.includes(roleId);
@@ -107,6 +108,28 @@ const taskServices = {
                     }
                 });
             });
+
+            // NOTIFICATION: Task Assigned
+            membersToAssign.forEach(memberId => {
+                // Find account ID for member (Notification needs Account ID)
+                // We'll do this async to not block response
+                prisma.account.findFirst({ where: { M_ID: memberId } }).then(acc => {
+                    if (acc) {
+                        createNotification(
+                            'task_assigned',
+                            acc.A_ID,
+                            actor.aid,
+                            `Bạn được giao công việc mới: "${title}"`,
+                            taskId,
+                            projectId
+                        );
+                    }
+                });
+            });
+
+            // LOGGING
+            const logService = (await import("./systemLogService.js")).default;
+            logService.createLog('create_task', actor.aid, `Created task "${title}"`, 'Task', taskId);
 
             return { status: 201, data: newTask };
         } catch (err) {
@@ -277,6 +300,76 @@ const taskServices = {
                     data,
                 });
 
+                // NOTIFICATIONS for simple update
+                // 1. Check Deadline Change
+                if (dueDate && task.Due_Date && new Date(dueDate).getTime() !== task.Due_Date.getTime()) {
+                    // Find task members to notify
+                    const members = await prisma.task_Member.findMany({ where: { T_ID: id }, include: { Member: { include: { Account: true } } } });
+                    members.forEach(tm => {
+                        if (tm.Member?.Account?.[0]?.A_ID) {
+                            createNotification(
+                                'deadline_changed',
+                                tm.Member.Account[0].A_ID,
+                                actor.aid,
+                                `Thời hạn công việc "${task.Title}" đã thay đổi.`,
+                                id,
+                                task.P_ID
+                            );
+                        }
+                    });
+                }
+
+                // 2. Check Status Change (Approval/Done/Return/Submit)
+                if (status && status !== task.Status) {
+                    let notifType = null;
+                    let msg = '';
+
+                    switch (status) {
+                        case 'approved':
+                            notifType = 'task_approved';
+                            msg = `Công việc "${task.Title}" đã được duyệt`;
+                            break;
+                        case 'returned':
+                            notifType = 'task_returned';
+                            msg = `Công việc "${task.Title}" đã bị trả lại. Vui lòng kiểm tra.`;
+                            break;
+                        case 'rejected':
+                            notifType = 'task_rejected';
+                            msg = `Công việc "${task.Title}" đã bị từ chối.`;
+                            break;
+                        case 'waiting-approval':
+                            notifType = 'task_submitted';
+                            msg = `Công việc "${task.Title}" đang chờ duyệt.`;
+                            break;
+                        case 'completed':
+                        case 'done':
+                            notifType = 'task_completed';
+                            msg = `Công việc "${task.Title}" đã hoàn thành.`;
+                            break;
+                        default:
+                            if (status !== task.Status) {
+                                notifType = 'status_changed';
+                                msg = `Trạng thái công việc "${task.Title}" đã đổi thành ${status}`;
+                            }
+                    }
+
+                    if (notifType) {
+                        const members = await prisma.task_Member.findMany({ where: { T_ID: id }, include: { Member: { include: { Account: true } } } });
+                        members.forEach(tm => {
+                            // Don't notify the actor themselves
+                            if (tm.Member?.Account?.[0]?.A_ID && tm.Member.Account[0].A_ID !== actor.aid) {
+                                createNotification(notifType, tm.Member.Account[0].A_ID, actor.aid, msg, id, task.P_ID);
+                            }
+                        });
+
+                        // If Submitted, notify Leader specifically if logic requires finding Project Leader (omitted for simplicity, notifying all task members including leader is okay for now)
+                    }
+                }
+
+                // LOGGING
+                const logService = (await import("./systemLogService.js")).default;
+                logService.createLog('update_task', actor.aid, `Updated task "${task.Title}"`, 'Task', id);
+
                 return { status: 200, data: updated };
             }
         } catch (err) {
@@ -305,6 +398,10 @@ const taskServices = {
                     Status: "deleted"
                 }
             });
+
+            // LOGGING
+            const logService = (await import("./systemLogService.js")).default;
+            logService.createLog('delete_task', actor.aid, `Deleted task "${task.Title}"`, 'Task', id);
 
             return { status: 200, data: deleted };
         } catch (err) {
@@ -350,18 +447,38 @@ const taskServices = {
     // --- Labels ---
     addLabel: async (req) => {
         try {
+            const actor = req.user;
             const { id } = req.params;
             const { name, color } = req.body;
-            // Simple approach: Always create new label for now, or find existing
-            // To be Trello-like, usually we reuse labels. 
-            // Let's check if a label with name/color exists? 
-            // For prototype, create new is safer/easier.
+
             const label = await prisma.label.create({
                 data: { Name: name, Color: color }
             });
             await prisma.task_Label.create({
                 data: { T_ID: id, L_ID: label.L_ID }
             });
+
+            // NOTIFICATION: Tag Added
+            // Fetch task to get project ID and members
+            const task = await prisma.task.findUnique({
+                where: { T_ID: id },
+                include: { Task_Member: { include: { Member: { include: { Account: true } } } } }
+            });
+            if (task) {
+                task.Task_Member.forEach(tm => {
+                    if (tm.Member?.Account?.[0]?.A_ID && tm.Member.Account[0].A_ID !== actor.aid) {
+                        createNotification(
+                            'label_added',
+                            tm.Member.Account[0].A_ID,
+                            actor.aid,
+                            `Công việc "${task.Title}" đã được gắn thẻ "${name}"`,
+                            id,
+                            task.P_ID
+                        );
+                    }
+                });
+            }
+
             return { status: 200, data: label };
         } catch (err) { return { status: 500, message: err.message }; }
     },
@@ -383,6 +500,30 @@ const taskServices = {
             const att = await prisma.attachment.create({
                 data: { FileName: fileName, FileUrl: fileUrl, T_ID: id }
             });
+            // NOTIFICATION: File Attached
+            const task = await prisma.task.findUnique({
+                where: { T_ID: id },
+                include: { Task_Member: { include: { Member: { include: { Account: true } } } } }
+            });
+            const actor = req.user; // Need user info for sender
+
+            if (task) {
+                task.Task_Member.forEach(tm => {
+                    const recipientId = tm.Member?.Account?.[0]?.A_ID;
+                    // Check if sender is defined (might not be if req.user not passed to addAttachment - need to check Controller)
+                    // Assuming controller passes user in req
+                    if (recipientId && (!actor || recipientId !== actor.aid)) {
+                        createNotification(
+                            'file_attached',
+                            recipientId,
+                            actor?.aid || null,
+                            `Tệp mới được đính kèm vào "${task.Title}"`,
+                            id,
+                            task.P_ID
+                        );
+                    }
+                });
+            }
             return { status: 200, data: att };
         } catch (err) { return { status: 500, message: err.message }; }
     },
@@ -411,6 +552,28 @@ const taskServices = {
                     Account: { select: { UserName: true, Avatar: true, M_ID: true } }
                 }
             });
+            // NOTIFICATION: New Comment
+            const task = await prisma.task.findUnique({
+                where: { T_ID: id },
+                include: { Task_Member: { include: { Member: { include: { Account: true } } } } }
+            });
+
+            if (task) {
+                task.Task_Member.forEach(tm => {
+                    const recipientId = tm.Member?.Account?.[0]?.A_ID;
+                    if (recipientId && recipientId !== actor.aid) { // Don't notify self
+                        createNotification(
+                            'comment',
+                            recipientId,
+                            actor.aid,
+                            `${actor.username || 'Ai đó'} đã bình luận trong "${task.Title}"`,
+                            id,
+                            task.P_ID
+                        );
+                    }
+                });
+            }
+
             return { status: 200, data: comment };
         } catch (err) { return { status: 500, message: err.message }; }
     },

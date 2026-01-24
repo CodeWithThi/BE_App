@@ -8,6 +8,8 @@ import taskRouter from "./task.js";
 import dashboardRouter from "./dashboard.js";
 import settingsRouter from "./settings.js";
 import uploadRouter from "./upload.js";
+import notificationRouter from "./notification.js";
+import systemLogRouter from "./systemLog.js";
 
 const rootRouter = express.Router();
 
@@ -20,5 +22,7 @@ rootRouter.use("/tasks", taskRouter);
 rootRouter.use("/dashboard", dashboardRouter);
 rootRouter.use("/settings", settingsRouter);
 rootRouter.use("/upload", uploadRouter);
+rootRouter.use("/notifications", notificationRouter);
+rootRouter.use("/system-logs", systemLogRouter);
 
 export default rootRouter;

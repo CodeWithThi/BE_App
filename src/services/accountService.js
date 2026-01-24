@@ -95,7 +95,7 @@ const accountServices = {
   listAccounts: async (req) => {
     const {
       page = 1,
-      limit = 10,
+      limit = 50,  // Increased from 10 to 50
       search,
       roleId,
       departmentId,
