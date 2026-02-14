@@ -10,6 +10,8 @@ import settingsRouter from "./settings.js";
 import uploadRouter from "./upload.js";
 import notificationRouter from "./notification.js";
 import systemLogRouter from "./systemLog.js";
+import taskReportRouter from "./taskReport.js";
+import escalationRouter from "../routes/escalationRoutes.js";
 
 const rootRouter = express.Router();
 
@@ -24,5 +26,8 @@ rootRouter.use("/settings", settingsRouter);
 rootRouter.use("/upload", uploadRouter);
 rootRouter.use("/notifications", notificationRouter);
 rootRouter.use("/system-logs", systemLogRouter);
+rootRouter.use("/reports", taskReportRouter);
+rootRouter.use("/escalate", escalationRouter);
 
 export default rootRouter;
+

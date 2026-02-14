@@ -63,6 +63,53 @@ const projectServices = {
                 },
             });
 
+            // Send notifications to Director and Admin about new project
+            try {
+                const { createNotification, getAccountsByRole, NOTIFICATION_TYPES } = await import("./notificationService.js");
+
+                // Notify Directors
+                const directorIds = await getAccountsByRole('director');
+                for (const dirId of directorIds) {
+                    if (dirId !== actor.aid) {
+                        await createNotification(
+                            NOTIFICATION_TYPES.PROJECT_CREATED,
+                            dirId,
+                            actor.aid,
+                            `Dự án mới được tạo: "${name}" (Phòng ban: ${dept.D_Name})`,
+                            null,
+                            projectId
+                        );
+                    }
+                }
+
+                // Notify Admins
+                const adminIds = await getAccountsByRole('admin');
+                for (const admId of adminIds) {
+                    if (admId !== actor.aid) {
+                        await createNotification(
+                            NOTIFICATION_TYPES.PROJECT_CREATED,
+                            admId,
+                            actor.aid,
+                            `Dự án mới được tạo: "${name}" (Phòng ban: ${dept.D_Name})`,
+                            null,
+                            projectId
+                        );
+                    }
+                }
+
+                console.log(`[NOTIFICATION] Project created: ${name} - notified ${directorIds.length} directors and ${adminIds.length} admins`);
+            } catch (notifErr) {
+                console.error("Failed to send project creation notifications:", notifErr.message);
+            }
+
+            // Log project creation
+            try {
+                const logService = (await import("./systemLogService.js")).default;
+                logService.createLog('create_project', actor.aid, `Created project "${name}"`, 'Project', projectId);
+            } catch (logErr) {
+                console.error("Failed to log project creation:", logErr.message);
+            }
+
             return { status: 201, data: newProject };
         } catch (err) {
             console.error("CREATE PROJECT ERROR:", err);
@@ -76,17 +123,40 @@ const projectServices = {
             const actor = req.user;
             const role = (actor.roleName || '').toLowerCase();
             const roleId = actor.roleId || '';
+            const userDeptId = actor.departmentId;
 
-            // STRICT RULE: Admin/System Admin cannot view projects
-            // "Admin hệ thống lại xem được dự án vậy cậu làm lố rồi"
-            if (role === 'admin' || role === 'system admin' || roleId === 'R_001') {
-                return { status: 403, message: "Admin không thể xem danh sách dự án (Chỉ dành cho PMO/Leader/Staff)" };
-            }
+            // STRICT RULE: Admin checks removed to allow visibility
+            // if (role === 'admin' || role === 'system admin' || roleId === 'R_001') {
+            //     return { status: 403, message: "..." };
+            // }
 
             // Optional: filtering by Department or Status
             const { departmentId, status } = req.query;
             const where = { IsDeleted: false };
-            if (departmentId) where.D_ID = departmentId;
+
+            // SECURITY SCOPING
+            // If NOT PMO, NOT Director, AND NOT Admin -> restrict to User's Department
+            /*
+            if (role !== 'pmo' && !role.includes('director') && !role.includes('sep') && !role.includes('admin') && role !== 'system') {
+                if (userDeptId) {
+                    where.D_ID = userDeptId;
+                } else {
+                    // If user has no department, they technically shouldn't see projects? 
+                    // Or maybe they are generic staff. Safest is to return empty if no department.
+                    // But let's assume Members always have Departments.
+                }
+            }
+            */
+
+            // User filter overrides if strictly tighter? No, security filter overrides user filter.
+            // If user passed departmentId, we use it IF it matches scoped D_ID (or if user is PMO).
+            if (departmentId) {
+                if (where.D_ID && where.D_ID !== departmentId) {
+                    // Attempting to view another dept -> Empty result
+                    return { status: 200, data: [] };
+                }
+                where.D_ID = departmentId;
+            }
             if (status) where.Status = status;
 
             const projects = await prisma.project.findMany({
@@ -94,12 +164,26 @@ const projectServices = {
                 include: {
                     Department: true,
                     Account: { select: { UserName: true } },
-                    Task: { select: { Status: true } }
-                }, // Created By
-                orderBy: { Begin_Date: 'desc' }
+                    Task: {
+                        where: { IsDeleted: false },
+                        select: { Status: true, Progress: true }
+                    }
+                },
+                orderBy: { P_ID: 'desc' }
             });
 
-            return { status: 200, data: projects };
+            // Calculate Progress
+            const projectsWithProgress = projects.map(p => {
+                const totalTasks = p.Task.length;
+                let avgProgress = 0;
+                if (totalTasks > 0) {
+                    const sum = p.Task.reduce((acc, t) => acc + (t.Progress || 0), 0);
+                    avgProgress = Math.round(sum / totalTasks);
+                }
+                return { ...p, Progress: avgProgress };
+            });
+
+            return { status: 200, data: projectsWithProgress };
         } catch (err) {
             console.error("LIST PROJECTS ERROR:", err);
             return { status: 500, message: "Server error listing projects" };
@@ -112,14 +196,29 @@ const projectServices = {
             const { id } = req.params;
             const project = await prisma.project.findUnique({
                 where: { P_ID: id },
-                include: { Department: true, Task: { where: { IsDeleted: false } } }
+                include: {
+                    Department: true,
+                    Task: {
+                        where: { IsDeleted: false },
+                        select: { Status: true, Progress: true, T_ID: true } // Include T_ID for mapping if needed, but here just used for calculation or list
+                    }
+                }
             });
 
             if (!project || project.IsDeleted) {
                 return { status: 404, message: "Project not found" };
             }
 
-            return { status: 200, data: project };
+            // Calculate Progress
+            const totalTasks = project.Task.length;
+            let avgProgress = 0;
+            if (totalTasks > 0) {
+                const sum = project.Task.reduce((acc, t) => acc + (t.Progress || 0), 0);
+                avgProgress = Math.round(sum / totalTasks);
+            }
+            const projectWithProgress = { ...project, Progress: avgProgress };
+
+            return { status: 200, data: projectWithProgress };
         } catch (err) {
             console.error("GET PROJECT ERROR:", err);
             return { status: 500, message: "Server error getting project" };
@@ -130,21 +229,97 @@ const projectServices = {
     updateProject: async (req) => {
         try {
             const { id } = req.params;
-            const { name, departmentId, beginDate, endDate, status } = req.body;
+            const actor = req.user;
+            const role = (actor.roleName || '').toLowerCase();
+            const { name, departmentId, beginDate, endDate, status, description, managerId } = req.body;
+
+            // ========================================
+            // STRICT ROLE-BASED PERMISSION CHECK
+            // ========================================
+            const isPMO = role === 'pmo';
+            const isDirector = role === 'director' || role === 'giám đốc';
+            const isAdmin = role === 'admin' || role === 'system admin' || role === 'admin hệ thống';
+            const isLeader = role === 'leader' || role === 'manager' || role === 'tp';
+            const isStaff = role === 'staff' || role === 'nhân viên';
+
+            // Admin and Staff cannot update projects
+            if (isAdmin) {
+                return { status: 403, message: "Admin hệ thống không tham gia vào workflow dự án." };
+            }
+            if (isStaff) {
+                return { status: 403, message: "Nhân viên không có quyền chỉnh sửa dự án." };
+            }
+            if (isLeader) {
+                return { status: 403, message: "Leader không có quyền chỉnh sửa dự án. Vui lòng liên hệ PMO." };
+            }
 
             const project = await prisma.project.findUnique({ where: { P_ID: id } });
             if (!project || project.IsDeleted) {
                 return { status: 404, message: "Project not found" };
             }
 
+            // Director: Only allowed to approve/reject status
+            if (isDirector) {
+                const allowedDirectorStatuses = ['approved', 'rejected', 'closed'];
+                if (status && allowedDirectorStatuses.includes(status)) {
+                    const updated = await prisma.project.update({
+                        where: { P_ID: id },
+                        data: { Status: status },
+                    });
+
+                    // Log director approval
+                    try {
+                        const logService = (await import("./systemLogService.js")).default;
+                        logService.createLog('project_approval', actor.aid, `Director ${status} project "${project.P_Name}"`, 'Project', id);
+                    } catch (e) { console.error(e); }
+
+                    // Send notifications to PMO and Leader
+                    try {
+                        const {
+                            notifyProjectApproved,
+                            notifyRole,
+                            NOTIFICATION_TYPES,
+                            MESSAGE_TEMPLATES
+                        } = await import("./notificationService.js");
+
+                        if (status === 'approved') {
+                            // Notify PMO and Leader that project is approved
+                            await notifyProjectApproved(project.P_Name, id, project.D_ID, actor.aid);
+                            console.log(`[NOTIFICATION] Director approved project "${project.P_Name}" - notified PMO and Leaders`);
+                        } else if (status === 'rejected') {
+                            // Notify PMO that project is rejected
+                            await notifyRole(
+                                NOTIFICATION_TYPES.PROJECT_DIRECTOR_REJECTED,
+                                'pmo',
+                                actor.aid,
+                                MESSAGE_TEMPLATES.PROJECT_DIRECTOR_REJECTED(project.P_Name),
+                                { projectId: id }
+                            );
+                            console.log(`[NOTIFICATION] Director rejected project "${project.P_Name}" - notified PMO`);
+                        }
+                    } catch (notifErr) {
+                        console.error("Failed to send project approval notification:", notifErr.message);
+                    }
+
+                    return { status: 200, data: updated, message: `Dự án đã được ${status === 'approved' ? 'phê duyệt' : status === 'rejected' ? 'từ chối' : 'đóng'}.` };
+                } else {
+                    return { status: 403, message: "Giám đốc chỉ có thể phê duyệt hoặc đóng dự án, không thể chỉnh sửa nội dung." };
+                }
+            }
+
+            // PMO: Full edit access
+            if (!isPMO) {
+                return { status: 403, message: `Role '${role}' không có quyền chỉnh sửa dự án.` };
+            }
+
             const data = {};
             if (name) data.P_Name = name;
-            if (req.body.description) data.P_Description = req.body.description; // Update description
+            if (description) data.P_Description = description;
             if (departmentId) data.D_ID = departmentId;
             if (beginDate) data.Begin_Date = new Date(beginDate);
             if (endDate) data.End_Date = new Date(endDate);
             if (status) data.Status = status;
-            if (req.body.managerId) data.Created_By_A_ID = req.body.managerId; // Allow updating manager (Created_By)
+            if (managerId) data.Created_By_A_ID = managerId;
 
             const updated = await prisma.project.update({
                 where: { P_ID: id },
@@ -162,7 +337,14 @@ const projectServices = {
     deleteProject: async (req) => {
         try {
             const actor = req.user;
+            const role = (actor.roleName || '').toLowerCase();
             const { id } = req.params;
+
+            // PERMISSION CHECK
+            // Only PMO can delete projects
+            if (role !== 'pmo') {
+                return { status: 403, message: "Access Denied: Only PMO can delete projects." };
+            }
 
             const project = await prisma.project.findUnique({ where: { P_ID: id } });
             if (!project || project.IsDeleted) {

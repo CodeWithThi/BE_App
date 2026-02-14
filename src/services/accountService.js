@@ -77,6 +77,19 @@ const accountServices = {
 
       const { PassWord, ...safeAcc } = account;
 
+      // Log the user creation
+      const logService = (await import("./systemLogService.js")).default;
+      logService.createLog('user_create', actor?.aid || 'system', `Created user ${username}`, 'Account', accountId);
+
+      // Notify admin about new user
+      const { createNotification, getAccountsByRole, NOTIFICATION_TYPES } = await import("./notificationService.js");
+      const adminIds = await getAccountsByRole('admin');
+      adminIds.forEach(adminId => {
+        if (adminId !== actor?.aid) {
+          createNotification(NOTIFICATION_TYPES.USER_ADDED, adminId, actor?.aid, `Người dùng mới được tạo: ${username}`, null, null);
+        }
+      });
+
       return {
         status: 201,
         data: {
@@ -249,6 +262,10 @@ const accountServices = {
         include: { Role: true, Member: true },
       });
 
+      // Log the update
+      const logService = (await import("./systemLogService.js")).default;
+      logService.createLog('user_update', actorAid, `Updated user ${updated.UserName}`, 'Account', A_ID);
+
       const { PassWord, ...safeAcc } = updated;
       return {
         status: 200,
@@ -338,6 +355,10 @@ const accountServices = {
         include: { Role: true, Member: true },
       });
 
+      // Log the deletion
+      const logService = (await import("./systemLogService.js")).default;
+      logService.createLog('user_delete', actorAid, `Deleted user ${deleted.UserName}`, 'Account', A_ID);
+
       const { PassWord, ...safeAcc } = deleted;
       return {
         status: 200,
@@ -376,6 +397,10 @@ const accountServices = {
         },
         include: { Role: true, Member: true },
       });
+
+      // Log the restore
+      const logService = (await import("./systemLogService.js")).default;
+      logService.createLog('user_restore', actorAid, `Restored user ${updated.UserName}`, 'Account', A_ID);
 
       const { PassWord, ...safeAcc } = updated;
       return {

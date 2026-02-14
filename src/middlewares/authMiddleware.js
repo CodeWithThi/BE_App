@@ -43,6 +43,7 @@ export const authMiddleware = {
         roleId: acc.R_ID,
         roleName: acc.Role?.R_Name,
         departmentId: acc.Member?.D_ID || null,
+        mid: acc.Member?.M_ID || null,
       };
 
       // Update Last_Active timestamp (non-blocking)
@@ -134,9 +135,9 @@ export const authMiddleware = {
           manager: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
           leader: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
           director: ["DEPARTMENT_LIST", "ACCOUNT_LIST"],
-          // staff (user) – không được list toàn bộ
-          user: [],
-          staff: [],
+          // staff (user) – allow listing for task assignment
+          user: ["ACCOUNT_LIST", "DEPARTMENT_LIST"],
+          staff: ["ACCOUNT_LIST", "DEPARTMENT_LIST"],
         };
 
         const perms = rolePermissions[roleName] || [];

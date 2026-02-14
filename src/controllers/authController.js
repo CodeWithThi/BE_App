@@ -27,6 +27,11 @@ const authController = {
     const r = await authServices.resetPassword(req);
     res.status(r.status).json(r);
   },
+
+  updateProfile: async (req, res) => {
+    const r = await authServices.updateProfile(req);
+    res.status(r.status).json(r);
+  },
 };
 
 export default authController;

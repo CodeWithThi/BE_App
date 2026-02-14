@@ -22,6 +22,9 @@ model Account {
   Avatar                                           String?       @db.VarChar(255)
   ResetToken                                       String?       @db.VarChar(255)
   ResetTokenExpires                                DateTime?     @db.DateTime(0)
+  FailedLoginAttempts                              Int           @default(0)
+  LockedUntil                                      DateTime?     @db.DateTime(0)
+  LastPasswordChange                               DateTime?     @db.DateTime(0)
   Member                                           Member?       @relation(fields: [M_ID], references: [M_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Account_Member")
   Role                                             Role          @relation(fields: [R_ID], references: [R_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Account_Role")
   Project                                          Project[]
@@ -162,6 +165,7 @@ model Task {
   Status           String?       @db.VarChar(30)
   Deleted_At       DateTime?     @db.DateTime(0)
   Deleted_By       String?       @db.VarChar(10)
+  Progress         Int           @default(0)
   IsDeleted        Boolean       @default(false)
   Member           Member?       @relation(fields: [Assigned_ID_M_ID], references: [M_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_AssignedMember")
   Account          Account?      @relation(fields: [Created_By_A_ID], references: [A_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Task_CreatedBy")

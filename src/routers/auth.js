@@ -25,5 +25,8 @@ authRouter.post("/forgot-password", authController.forgotPassword);
 // F05 – Đặt lại mật khẩu (với token)
 authRouter.post("/reset-password", authController.resetPassword);
 
+// F06 – Cập nhật thông tin cá nhân (SĐT)
+authRouter.put("/profile", authMiddleware.verifyToken, authController.updateProfile);
+
 export default authRouter;
 
