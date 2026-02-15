@@ -7,7 +7,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "npx prisma generate && nodemon --import=extensionless/register server.js",
-    "start": "node --import=extensionless/register server.js"
+    "start": "node --import=extensionless/register server.js",
+    "start:prod": "npx prisma generate && pm2 start ecosystem.config.cjs --env production"
   },
   "author": "",
   "license": "ISC",
@@ -15,10 +16,13 @@
     "@prisma/client": "^6.18.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
+    "compression": "^1.8.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
     "extensionless": "^2.0.2",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.12",

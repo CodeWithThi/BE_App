@@ -290,4 +290,6 @@ model SystemLog {
   @@index([ActorId])
   @@index([Action])
   @@index([CreatedAt])
+  @@index([TargetId])
+  @@index([Action, CreatedAt])
 }

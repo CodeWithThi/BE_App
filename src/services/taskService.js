@@ -202,7 +202,13 @@ const taskServices = {
         try {
             const actor = req.user;
             const role = (actor.roleName || '').toLowerCase();
-            const { projectId, assignedTo, status } = req.query;
+            const { projectId, assignedTo, status, page, limit } = req.query;
+
+            // Pagination config
+            const pageNum = Math.max(1, parseInt(page) || 1);
+            const pageSize = Math.min(100, Math.max(1, parseInt(limit) || 50));
+            const skip = (pageNum - 1) * pageSize;
+
             const where = {
                 IsDeleted: false,
                 Parent_T_ID: null  // Only get main tasks, exclude subtasks
@@ -255,25 +261,44 @@ const taskServices = {
 
             // Admin/PMO see all.
 
-            const tasks = await prisma.task.findMany({
-                where,
-                include: {
-                    Member: { include: { Department: true } },
-                    Project: { include: { Department: true } },
-                    Account: { select: { UserName: true } },
-                    Task_Member: {
-                        include: {
-                            Member: { include: { Department: true } }
-                        }
+            // Run count + data queries in parallel for efficiency
+            const [tasks, total] = await Promise.all([
+                prisma.task.findMany({
+                    where,
+                    include: {
+                        Member: { include: { Department: { select: { D_ID: true, D_Name: true } } } },
+                        Project: { include: { Department: { select: { D_ID: true, D_Name: true } } } },
+                        Account: { select: { UserName: true } },
+                        Task_Member: {
+                            include: {
+                                Member: { include: { Department: { select: { D_ID: true, D_Name: true } } } }
+                            }
+                        },
+                        ChecklistItems: { select: { CL_ID: true, Content: true, IsCompleted: true } },
+                        Task_Labels: { include: { Label: { select: { L_ID: true, Name: true, Color: true } } } },
+                        Attachments: { select: { AT_ID: true, FileName: true, FileUrl: true, UploadDate: true } },
+                        _count: { select: { Subtasks: true, TaskComments: true } }
                     },
-                    ChecklistItems: true,
-                    Task_Labels: { include: { Label: true } },
-                    Attachments: true
-                },
-                orderBy: { Created_By_A_ID: 'desc' }
-            });
+                    orderBy: { Created_By_A_ID: 'desc' },
+                    skip,
+                    take: pageSize
+                }),
+                prisma.task.count({ where })
+            ]);
 
-            return { status: 200, data: tasks };
+            const totalPages = Math.ceil(total / pageSize);
+
+            return {
+                status: 200,
+                data: tasks,
+                pagination: {
+                    total,
+                    page: pageNum,
+                    limit: pageSize,
+                    totalPages,
+                    hasMore: pageNum < totalPages
+                }
+            };
         } catch (err) {
             console.error("LIST TASKS ERROR:", err);
             return { status: 500, message: "Server error listing tasks" };
@@ -287,15 +312,15 @@ const taskServices = {
             const task = await prisma.task.findUnique({
                 where: { T_ID: id },
                 include: {
-                    Member: { include: { Department: true } },
-                    Project: { include: { Department: true } },
+                    Member: { include: { Department: { select: { D_ID: true, D_Name: true } } } },
+                    Project: { include: { Department: { select: { D_ID: true, D_Name: true } } } },
                     Subtasks: {
                         where: { IsDeleted: false },
                         include: {
                             Member: true,
                             Task_Member: {
                                 include: {
-                                    Member: { include: { Department: true } }
+                                    Member: { include: { Department: { select: { D_ID: true, D_Name: true } } } }
                                 }
                             }
                         }
@@ -303,16 +328,18 @@ const taskServices = {
                     Task_Report: { where: { IsDeleted: false } },
                     Task_Member: {
                         include: {
-                            Member: { include: { Department: true } }
+                            Member: { include: { Department: { select: { D_ID: true, D_Name: true } } } }
                         }
                     },
-                    ChecklistItems: true,
-                    Task_Labels: { include: { Label: true } },
-                    Attachments: true,
+                    ChecklistItems: { select: { CL_ID: true, Content: true, IsCompleted: true } },
+                    Task_Labels: { include: { Label: { select: { L_ID: true, Name: true, Color: true } } } },
+                    Attachments: { select: { AT_ID: true, FileName: true, FileUrl: true, UploadDate: true } },
                     TaskComments: {
                         include: { Account: { select: { UserName: true, Avatar: true, M_ID: true } } },
-                        orderBy: { Created_At: 'desc' }
-                    }
+                        orderBy: { Created_At: 'desc' },
+                        take: 50
+                    },
+                    _count: { select: { Subtasks: true, TaskComments: true } }
                 }
             });
 
@@ -457,14 +484,17 @@ const taskServices = {
                         where: { T_ID: id },
                         include: {
                             Member: true,
-                            Project: { include: { Department: true } },
+                            Project: { include: { Department: { select: { D_ID: true, D_Name: true } } } },
                             Task_Member: {
                                 include: {
-                                    Member: { include: { Department: true } }
+                                    Member: { include: { Department: { select: { D_ID: true, D_Name: true } } } }
                                 }
                             }
                         }
                     });
+                }, {
+                    maxWait: 5000,   // Max 5s to wait for transaction slot
+                    timeout: 10000,  // Max 10s for transaction to complete
                 });
 
                 // LOGGING STATUS CHANGE

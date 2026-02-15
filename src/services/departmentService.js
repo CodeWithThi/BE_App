@@ -1,5 +1,6 @@
 // src/services/departmentService.js
 import prisma from "../config/database.js";
+import cache from "../config/cache.js";
 
 const genDepartmentId = () => {
   return "D_" + Date.now().toString().slice(-3) + Math.floor(Math.random() * 10);
@@ -41,6 +42,9 @@ const departmentServices = {
         },
       });
 
+      // Invalidate department cache after creation
+      cache.invalidate('departments:*');
+
       return {
         status: 201,
         data: {
@@ -76,6 +80,8 @@ const departmentServices = {
         },
       });
 
+      cache.invalidate('departments:*');
+
       return { status: 200, data: updated };
     } catch (err) {
       console.error("UPDATE DEPARTMENT ERROR:", err);
@@ -108,6 +114,8 @@ const departmentServices = {
         },
       });
 
+      cache.invalidate('departments:*');
+
       return { status: 200, data: deleted };
     } catch (err) {
       console.error("DELETE DEPARTMENT ERROR:", err);
@@ -118,13 +126,15 @@ const departmentServices = {
   // ✅ danh sách phòng ban
   listDepartments: async () => {
     try {
-      const deps = await prisma.department.findMany({
-        where: { IsDeleted: false },
-        include: {
-          _count: {
-            select: { Member: true, Project: true }
+      const deps = await cache.getOrSet('departments:list', 300, async () => {
+        return prisma.department.findMany({
+          where: { IsDeleted: false },
+          include: {
+            _count: {
+              select: { Member: true, Project: true }
+            }
           }
-        }
+        });
       });
       return { status: 200, data: deps };
     } catch (err) {
