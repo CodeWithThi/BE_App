@@ -48,13 +48,9 @@ USER nodeapp
 
 # Environment
 ENV NODE_ENV=production
-ENV PORT=3069
 
-EXPOSE 3069
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3069/health || exit 1
+# Railway assigns PORT dynamically via env var, no need to hardcode
+# The app reads process.env.PORT in server.js
 
 # Use dumb-init for proper PID 1 signal handling
 ENTRYPOINT ["dumb-init", "--"]

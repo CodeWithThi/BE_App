@@ -16,14 +16,9 @@ module.exports = {
             env_production: {
                 NODE_ENV: 'production',
                 PORT: 3069,
-
-                DATABASE_URL: 'mysql://taskuser:StrongPassword123@127.0.0.1:3306/QL_TaskManagement',
-
-                ACCESS_TOKEN_SECRET: 'OzC0XbxWJDMSYOQ2c6/jjlteXjZx8d51e182gkzV',
-                ACCESS_TOKEN_EXPIRES_IN: '8h',
-
-                REFRESH_TOKEN_SECRET: 'H6ZXDFIzLFbF3VVfu',
-                REFRESH_TOKEN_EXPIRES_IN: '7d'
+                // ⚠️ Các biến nhạy cảm (DATABASE_URL, SECRET keys) 
+                // được set qua Railway Variables hoặc file .env (đã gitignore)
+                // KHÔNG hardcode ở đây!
             },
 
             log_date_format: 'YYYY-MM-DD HH:mm:ss',
