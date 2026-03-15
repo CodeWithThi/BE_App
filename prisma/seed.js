@@ -60,35 +60,35 @@ async function main() {
 
     const users = [
         {
-            m_id: 'M_ADMIN', name: 'Super Admin', email: 'admin@work.com', username: 'admin',
+            m_id: 'M_ADMIN', a_id: 'A_ADMIN', name: 'Super Admin', email: 'admin@work.com', username: 'admin',
             r_id: 'R_ADMIN', d_id: 'D_IT'
         },
         {
-            m_id: 'M_DIR', name: 'Director One', email: 'director@work.com', username: 'director',
+            m_id: 'M_DIR', a_id: 'A_DIR', name: 'Director One', email: 'director@work.com', username: 'director',
             r_id: 'R_DIRECTOR', d_id: 'D_BOARD'
         },
         {
-            m_id: 'M_PMO', name: 'PMO Manager', email: 'pmo@work.com', username: 'pmo',
+            m_id: 'M_PMO', a_id: 'A_PMO', name: 'PMO Manager', email: 'pmo@work.com', username: 'pmo',
             r_id: 'R_PMO', d_id: 'D_IT'
         },
         {
-            m_id: 'M_LEADER1', name: 'IT Leader', email: 'leader_it@work.com', username: 'leader_it',
+            m_id: 'M_LEADER1', a_id: 'A_LEAD_IT', name: 'IT Leader', email: 'leader_it@work.com', username: 'leader_it',
             r_id: 'R_LEADER', d_id: 'D_IT'
         },
         {
-            m_id: 'M_STAFF1', name: 'IT Staff One', email: 'staff1_it@work.com', username: 'staff1',
+            m_id: 'M_STAFF1', a_id: 'A_STAFF1', name: 'IT Staff One', email: 'staff1_it@work.com', username: 'staff1',
             r_id: 'R_STAFF', d_id: 'D_IT'
         },
         {
-            m_id: 'M_STAFF2', name: 'IT Staff Two', email: 'staff2_it@work.com', username: 'staff2',
+            m_id: 'M_STAFF2', a_id: 'A_STAFF2', name: 'IT Staff Two', email: 'staff2_it@work.com', username: 'staff2',
             r_id: 'R_STAFF', d_id: 'D_IT'
         },
         {
-            m_id: 'M_LEADER2', name: 'HR Leader', email: 'leader_hr@work.com', username: 'leader_hr',
+            m_id: 'M_LEADER2', a_id: 'A_LEAD_HR', name: 'HR Leader', email: 'leader_hr@work.com', username: 'leader_hr',
             r_id: 'R_LEADER', d_id: 'D_HR'
         },
         {
-            m_id: 'M_STAFF3', name: 'HR Staff One', email: 'staff1_hr@work.com', username: 'staff3',
+            m_id: 'M_STAFF3', a_id: 'A_STAFF3', name: 'HR Staff One', email: 'staff1_hr@work.com', username: 'staff3',
             r_id: 'R_STAFF', d_id: 'D_HR'
         }
     ];
@@ -109,7 +109,7 @@ async function main() {
         // A_ID will be simple concatenation 'A_' + username for predictability
         await prisma.account.create({
             data: {
-                A_ID: `A_${u.username.toUpperCase()}`,
+                A_ID: u.a_id,
                 UserName: u.username,
                 PassWord: passwordHash,
                 Email: u.email,
@@ -141,7 +141,7 @@ async function main() {
             P_ID: 'P_002',
             P_Name: 'Recruitment Drive 2026',
             D_ID: 'D_HR',
-            Created_By_A_ID: 'A_DIRECTOR',
+            Created_By_A_ID: 'A_DIR',
             Status: 'Active',
             Begin_Date: new Date(),
             End_Date: new Date(new Date().setDate(new Date().getDate() + 60))
@@ -157,7 +157,7 @@ async function main() {
             Title: 'Fix Login Bugs',
             Description: 'Resolve the issue with the login API.',
             P_ID: 'P_001',
-            Created_By_A_ID: 'A_LEADER_IT', // Leader creates
+            Created_By_A_ID: 'A_LEAD_IT', // Leader creates
             Status: 'Todo',
             Priority: 'High',
             Begin_Date: new Date(),
@@ -179,7 +179,7 @@ async function main() {
             Title: 'Database Optimization',
             Description: 'Index the core tables.',
             P_ID: 'P_001',
-            Created_By_A_ID: 'A_LEADER_IT', // Leader creates
+            Created_By_A_ID: 'A_LEAD_IT', // Leader creates
             Status: 'Processing',
             Priority: 'Medium',
             Begin_Date: new Date(),
@@ -198,7 +198,7 @@ async function main() {
             Title: 'Screen Candidates',
             Description: 'Review resumes for the new opening.',
             P_ID: 'P_002',
-            Created_By_A_ID: 'A_LEADER_HR',
+            Created_By_A_ID: 'A_LEAD_HR',
             Status: 'Pending',
             Priority: 'Normal',
             Begin_Date: new Date(),
